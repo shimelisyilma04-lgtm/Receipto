@@ -1,0 +1,1191 @@
+{
+  "users": [
+    {
+      "id": "88283756-9928-4e40-8df2-d5cc06317400",
+      "email": "engineer_1789668278751@invoicepilot.test",
+      "password_hash": "$2b$10$qX5OXjVBfEHqji1SiO24AeETqs/Yr4I2wVDmfCjJJUaAID2tJzZ2K",
+      "name": "Senior Engineer",
+      "business_name": "Pilot Consulting Ltd",
+      "created_at": "2026-09-17T18:04:38.955Z",
+      "updated_at": "2026-09-17T18:04:38.955Z",
+      "email_verified": false,
+      "terms_accepted_at": null,
+      "terms_version": "1.0"
+    },
+    {
+      "id": "5d09d751-4caa-439e-9f66-c0b1c456e922",
+      "email": "intruder_1789668278751@invoicepilot.test",
+      "password_hash": "$2b$10$fnVnoYAx7VKR96nVTs1Gqu4oefXuD3DsV/XlEFiksWFcHXE3F0BYS",
+      "name": "Intruder User",
+      "business_name": "Intruder User's Business",
+      "created_at": "2026-09-17T18:04:39.377Z",
+      "updated_at": "2026-09-17T18:04:39.377Z",
+      "email_verified": false,
+      "terms_accepted_at": null,
+      "terms_version": "1.0"
+    },
+    {
+      "id": "c5ceb912-6b57-4c10-a992-428e7d22b109",
+      "email": "engineer_1789668282346@invoicepilot.test",
+      "password_hash": "$2b$10$aQIdqzrt0OnvyCl1gBSl8.iBjjE/.dAtFjO1bGZT766L9hGiOAetG",
+      "name": "Senior Engineer",
+      "business_name": "Pilot Consulting Ltd",
+      "created_at": "2026-09-17T18:04:42.487Z",
+      "updated_at": "2026-09-17T18:04:42.487Z",
+      "email_verified": false,
+      "terms_accepted_at": null,
+      "terms_version": "1.0"
+    },
+    {
+      "id": "800666a0-14f7-4839-88eb-a0dd7e8f303d",
+      "email": "intruder_1789668282346@invoicepilot.test",
+      "password_hash": "$2b$10$BljR88dK1566yD145pZt8.gE1xRIYvn9k.sqcevyqODz8EqDUWqnG",
+      "name": "Intruder User",
+      "business_name": "Intruder User's Business",
+      "created_at": "2026-09-17T18:04:42.914Z",
+      "updated_at": "2026-09-17T18:04:42.914Z",
+      "email_verified": false,
+      "terms_accepted_at": null,
+      "terms_version": "1.0"
+    },
+    {
+      "id": "f903e1a7-8712-4256-ba87-80d54a6b9074",
+      "email": "shimelisyilma04@gmail.com",
+      "password_hash": "$2b$10$APaXn7LQxiuGktXX.6fE7.Dr1CHNIU0m2mrhOFfgsEYy2uKJ.J/3u",
+      "name": "Rediwt yilma",
+      "business_name": "Morgan",
+      "created_at": "2026-09-17T18:07:27.573Z",
+      "updated_at": "2026-09-19T19:25:49.982Z",
+      "email_verified": false,
+      "terms_accepted_at": null,
+      "terms_version": "1.0",
+      "role": "ADMIN"
+    },
+    {
+      "id": "8fd74083-921a-487f-a66e-ef128c82c963",
+      "email": "test_pilot_1789669585587@example.com",
+      "password_hash": "$2b$10$Abrx0U5D33M0V7z5eMp4nucA1Vqin/uur/E4lMQK3ndZX0x4gKMZW",
+      "name": "Jane Production",
+      "business_name": "Acme Test Corp",
+      "email_verified": false,
+      "terms_accepted_at": "2026-09-17T18:26:25.902Z",
+      "terms_version": "1.0",
+      "created_at": "2026-09-17T18:26:25.903Z",
+      "updated_at": "2026-09-17T18:26:25.903Z"
+    },
+    {
+      "id": "44fb2beb-2e23-4b52-a5db-e6e2d4ff52ea",
+      "email": "engineer_1789670774933@receipto.test",
+      "password_hash": "$2b$10$my1OEYYUpRU10.l6IP/hKOQ9FS1eqTHZHpUjX01i1u54eyjiHuA.G",
+      "name": "Senior Engineer",
+      "business_name": "Pilot Consulting Ltd",
+      "email_verified": true,
+      "terms_accepted_at": "2026-09-17T18:46:15.077Z",
+      "terms_version": "1.0",
+      "created_at": "2026-09-17T18:46:15.077Z",
+      "updated_at": "2026-09-17T18:46:15.077Z"
+    },
+    {
+      "id": "3ce460dc-6ac3-46e8-abc6-8714fea0a316",
+      "email": "intruder_1789670774933@receipto.test",
+      "password_hash": "$2b$10$FgE/l8fVZFB3qjgIYVinW.H5Sdod9XwWH9M0sMKGuuEj.4IrY/FFa",
+      "name": "Intruder User",
+      "business_name": "Intruder User's Business",
+      "email_verified": true,
+      "terms_accepted_at": "2026-09-17T18:46:15.983Z",
+      "terms_version": "1.0",
+      "created_at": "2026-09-17T18:46:15.983Z",
+      "updated_at": "2026-09-17T18:46:15.983Z"
+    },
+    {
+      "id": "8018ff99-6a3d-40cb-9fc8-ff8dc30efea0",
+      "email": "corrected_1789788978584@example.com",
+      "password_hash": "$2b$10$4srlrz0Z3Iq9FD4WlPyJ0ONFHe/2PgbfmWXMgT4d6tznl1J16FIU6",
+      "name": "Test Tester",
+      "business_name": "Test Tester's Business",
+      "email_verified": false,
+      "terms_accepted_at": "2026-09-19T03:36:18.409Z",
+      "terms_version": "1.0",
+      "created_at": "2026-09-19T03:36:18.409Z",
+      "updated_at": "2026-09-19T03:36:18.586Z"
+    },
+    {
+      "id": "e36e120b-7785-411d-96f9-5ac2f2a1b6b7",
+      "email": "corrected_1789788985698@example.com",
+      "password_hash": "$2b$10$o7IxFjzoopHQwQXP3RcauuOb0myuI5J2PLOAPWxVU4B5RL/WmNSAa",
+      "name": "Test Tester",
+      "business_name": "Test Tester's Business",
+      "email_verified": true,
+      "terms_accepted_at": "2026-09-19T03:36:25.284Z",
+      "terms_version": "1.0",
+      "created_at": "2026-09-19T03:36:25.285Z",
+      "updated_at": "2026-09-19T03:36:25.804Z"
+    },
+    {
+      "id": "445f5922-392e-40e0-8b83-717ea41ddcf4",
+      "email": "user_1789788990240@example.com",
+      "password_hash": "$2b$10$v7PJtdoK8deU0mjDsXS4TuELOOG9YJa5ljQLcDPZEzimAo8bh7bI2",
+      "name": "Verified User",
+      "business_name": "Verified User's Business",
+      "email_verified": true,
+      "terms_accepted_at": "2026-09-19T03:36:30.362Z",
+      "terms_version": "1.0",
+      "created_at": "2026-09-19T03:36:30.362Z",
+      "updated_at": "2026-09-19T03:36:30.486Z"
+    },
+    {
+      "id": "d36c3629-9a70-4f6d-bccc-b421730a6577",
+      "email": "user2_1789789010350@example.com",
+      "password_hash": "$2b$10$f9skj1qkUzhWJkJ719NjZeyWfuZg2iMhaYE.X9pZrYiWnHQ2FlHiC",
+      "name": "Verified User",
+      "business_name": "Verified User's Business",
+      "email_verified": true,
+      "terms_accepted_at": "2026-09-19T03:36:50.475Z",
+      "terms_version": "1.0",
+      "created_at": "2026-09-19T03:36:50.475Z",
+      "updated_at": "2026-09-19T03:36:50.852Z"
+    },
+    {
+      "id": "08d91eba-1dc4-4339-92ed-7072c6022672",
+      "email": "engineer_1789808052855@receipto.test",
+      "password_hash": "$2b$10$mxaJsXSezhY2a0bLW9Pg6OZUDxSVQSPq9quUVCw49wvvtXZaYdD1m",
+      "name": "Senior Engineer",
+      "business_name": "Pilot Consulting Ltd",
+      "email_verified": true,
+      "terms_accepted_at": "2026-09-19T08:54:13.032Z",
+      "terms_version": "1.0",
+      "created_at": "2026-09-19T08:54:13.033Z",
+      "updated_at": "2026-09-19T08:54:13.033Z"
+    },
+    {
+      "id": "7f63539d-41a6-4937-a2e7-2bbf81fd260c",
+      "email": "intruder_1789808052855@receipto.test",
+      "password_hash": "$2b$10$6nLpHsaHHybbVw7uQgxCse4905J.oE3yi4bXV362EWfqgQnC/o3ny",
+      "name": "Intruder User",
+      "business_name": "Intruder User's Business",
+      "email_verified": true,
+      "terms_accepted_at": "2026-09-19T08:54:13.781Z",
+      "terms_version": "1.0",
+      "created_at": "2026-09-19T08:54:13.782Z",
+      "updated_at": "2026-09-19T08:54:13.782Z"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "804ad992c5ef5ee8fe22455bdc9575d5f16cdc8d393978d5e820e0ad302d69da",
+      "user_id": "88283756-9928-4e40-8df2-d5cc06317400",
+      "expires_at": "2026-09-24T18:04:38.955Z",
+      "created_at": "2026-09-17T18:04:38.955Z"
+    },
+    {
+      "id": "19a19befb7353a3a3621ad50d631eac45811f80fc50f49d09071100af5201b49",
+      "user_id": "88283756-9928-4e40-8df2-d5cc06317400",
+      "expires_at": "2026-09-24T18:04:39.200Z",
+      "created_at": "2026-09-17T18:04:39.200Z"
+    },
+    {
+      "id": "e313899cf6914fb78a6e362e34c96b841cf448a36b0a7a9816625e8aa2c44e87",
+      "user_id": "5d09d751-4caa-439e-9f66-c0b1c456e922",
+      "expires_at": "2026-09-24T18:04:39.377Z",
+      "created_at": "2026-09-17T18:04:39.377Z"
+    },
+    {
+      "id": "0468d9881fb6a1dfc9af2b38fe2aca74cb3484e5ee5b7715afe4eafdaebd2cb7",
+      "user_id": "c5ceb912-6b57-4c10-a992-428e7d22b109",
+      "expires_at": "2026-09-24T18:04:42.488Z",
+      "created_at": "2026-09-17T18:04:42.488Z"
+    },
+    {
+      "id": "6834440e15a1a5e1e113977abecfce317fa14bd05ca4a3fde17b11ac5ee9a61d",
+      "user_id": "c5ceb912-6b57-4c10-a992-428e7d22b109",
+      "expires_at": "2026-09-24T18:04:42.727Z",
+      "created_at": "2026-09-17T18:04:42.727Z"
+    },
+    {
+      "id": "a960587ba01a1a3f461b7d96812c8440e4a9f33556c9fbbf16db61bf7e72a943",
+      "user_id": "800666a0-14f7-4839-88eb-a0dd7e8f303d",
+      "expires_at": "2026-09-24T18:04:42.915Z",
+      "created_at": "2026-09-17T18:04:42.915Z"
+    },
+    {
+      "id": "4ae54e43fb0c2bb7c01affb4bb82589d70beea2d70d4a8232ee37f1447e49713",
+      "user_id": "f903e1a7-8712-4256-ba87-80d54a6b9074",
+      "expires_at": "2026-09-24T18:07:27.574Z",
+      "created_at": "2026-09-17T18:07:27.574Z"
+    },
+    {
+      "id": "d7017085af6322eb30db660128d8c5b226db0ef4bf0ebf7dce1e183756bb3c59",
+      "user_id": "8fd74083-921a-487f-a66e-ef128c82c963",
+      "expires_at": "2026-09-24T18:26:26.327Z",
+      "created_at": "2026-09-17T18:26:26.327Z"
+    },
+    {
+      "id": "bbbb719c1f97e61adf02ac0bf9baa76f78daf965b35e8a808e1daf03d5923ac9",
+      "user_id": "44fb2beb-2e23-4b52-a5db-e6e2d4ff52ea",
+      "expires_at": "2026-09-24T18:46:15.453Z",
+      "created_at": "2026-09-17T18:46:15.453Z"
+    },
+    {
+      "id": "5e06f0683ec4535961c5355b0dd561c67084053cdf83775f4bf7cd519ff63c1e",
+      "user_id": "44fb2beb-2e23-4b52-a5db-e6e2d4ff52ea",
+      "expires_at": "2026-09-24T18:46:15.701Z",
+      "created_at": "2026-09-17T18:46:15.701Z"
+    },
+    {
+      "id": "692d37021924f440fb8a7b0b70f5fbbc24e8a90e2c35a3c24315adc9fd8bb043",
+      "user_id": "3ce460dc-6ac3-46e8-abc6-8714fea0a316",
+      "expires_at": "2026-09-24T18:46:16.083Z",
+      "created_at": "2026-09-17T18:46:16.083Z"
+    },
+    {
+      "id": "d288af99afe20f232663c7ef8b3fea37bb05ba359000d5f7a840434b3255f355",
+      "user_id": "8018ff99-6a3d-40cb-9fc8-ff8dc30efea0",
+      "expires_at": "2026-09-26T03:36:18.567Z",
+      "created_at": "2026-09-19T03:36:18.567Z"
+    },
+    {
+      "id": "44330ab3eaadd428bb1161d715bf1f55dcb6f23aa3c533cd12f88ffecb6d6c77",
+      "user_id": "e36e120b-7785-411d-96f9-5ac2f2a1b6b7",
+      "expires_at": "2026-09-26T03:36:25.679Z",
+      "created_at": "2026-09-19T03:36:25.679Z"
+    },
+    {
+      "id": "47bf46c958d14ffcbf45ccf4ba56a63d46d20137ddb0f58007e96db077143698",
+      "user_id": "e36e120b-7785-411d-96f9-5ac2f2a1b6b7",
+      "expires_at": "2026-09-26T03:36:25.804Z",
+      "created_at": "2026-09-19T03:36:25.804Z"
+    },
+    {
+      "id": "d9d37cb456d4d2caacddbd463cc6b5ace5c11f5400d7c64ddc324a488973a26f",
+      "user_id": "445f5922-392e-40e0-8b83-717ea41ddcf4",
+      "expires_at": "2026-09-26T03:36:30.477Z",
+      "created_at": "2026-09-19T03:36:30.477Z"
+    },
+    {
+      "id": "c7a350a59b5531656d215d52f7b0186efbdf1c6ea88b07a52b16c279a84054c6",
+      "user_id": "445f5922-392e-40e0-8b83-717ea41ddcf4",
+      "expires_at": "2026-09-26T03:36:30.487Z",
+      "created_at": "2026-09-19T03:36:30.487Z"
+    },
+    {
+      "id": "fa5f34b383bf51c9052b1a0e8197719acabad150b044387d2a41d9a691dbee79",
+      "user_id": "d36c3629-9a70-4f6d-bccc-b421730a6577",
+      "expires_at": "2026-09-26T03:36:50.843Z",
+      "created_at": "2026-09-19T03:36:50.843Z"
+    },
+    {
+      "id": "5f7af78e96d765b160de54dc33be3a5df65e503d6f37148a8aa9efeb75da2962",
+      "user_id": "d36c3629-9a70-4f6d-bccc-b421730a6577",
+      "expires_at": "2026-09-26T03:36:50.853Z",
+      "created_at": "2026-09-19T03:36:50.853Z"
+    },
+    {
+      "id": "8a70a2eeefe637954b0fc3f1c5cf16ef3e3cb022ced67868633be0176d376668",
+      "user_id": "08d91eba-1dc4-4339-92ed-7072c6022672",
+      "expires_at": "2026-09-26T08:54:13.185Z",
+      "created_at": "2026-09-19T08:54:13.185Z"
+    },
+    {
+      "id": "bff4a1660f74bc7a6027fd45db79605a0fa2f101abd28fbf3eaecebe496777f8",
+      "user_id": "08d91eba-1dc4-4339-92ed-7072c6022672",
+      "expires_at": "2026-09-26T08:54:13.465Z",
+      "created_at": "2026-09-19T08:54:13.465Z"
+    },
+    {
+      "id": "44ebca0f586cb3bd126624867380f47b1f5be48a58e70f98ddbe430ebbcf09fe",
+      "user_id": "7f63539d-41a6-4937-a2e7-2bbf81fd260c",
+      "expires_at": "2026-09-26T08:54:13.881Z",
+      "created_at": "2026-09-19T08:54:13.881Z"
+    }
+  ],
+  "clients": [
+    {
+      "id": "59ca73b9-5a80-442d-81ae-46f4a752fc0c",
+      "user_id": "88283756-9928-4e40-8df2-d5cc06317400",
+      "name": "Stark Industries",
+      "email": "pepper@stark.com",
+      "phone": "+1 555-0199",
+      "company": "Stark Industries LLC",
+      "address": "10880 Malibu Point, CA",
+      "created_at": "2026-09-17T18:04:39.212Z",
+      "updated_at": "2026-09-17T18:04:39.212Z"
+    },
+    {
+      "id": "4a2c55f2-8a02-4993-8b75-6965955b1b48",
+      "user_id": "c5ceb912-6b57-4c10-a992-428e7d22b109",
+      "name": "Stark Industries",
+      "email": "pepper@stark.com",
+      "phone": "+1 555-0199",
+      "company": "Stark Industries LLC",
+      "address": "10880 Malibu Point, CA",
+      "created_at": "2026-09-17T18:04:42.736Z",
+      "updated_at": "2026-09-17T18:04:42.736Z"
+    },
+    {
+      "id": "dcc48336-db6b-4bd4-a49a-c21034908a90",
+      "user_id": "44fb2beb-2e23-4b52-a5db-e6e2d4ff52ea",
+      "name": "Stark Industries",
+      "email": "pepper@stark.com",
+      "phone": "+1 555-0199",
+      "company": "Stark Industries LLC",
+      "address": "10880 Malibu Point, CA",
+      "created_at": "2026-09-17T18:46:15.713Z",
+      "updated_at": "2026-09-17T18:46:15.713Z"
+    },
+    {
+      "id": "68545beb-e393-4da0-8875-7e18018f14af",
+      "user_id": "445f5922-392e-40e0-8b83-717ea41ddcf4",
+      "name": "Acme Corp",
+      "email": "billing@acmecorp.com",
+      "created_at": "2026-09-19T03:36:30.500Z",
+      "updated_at": "2026-09-19T03:36:30.500Z"
+    },
+    {
+      "id": "6a1c3c9e-c4b6-4b37-85cc-b2625998073a",
+      "user_id": "d36c3629-9a70-4f6d-bccc-b421730a6577",
+      "name": "Acme Corp",
+      "email": "billing@acmecorp.com",
+      "created_at": "2026-09-19T03:36:50.860Z",
+      "updated_at": "2026-09-19T03:36:50.860Z"
+    },
+    {
+      "id": "348f4c18-12e6-401b-b82f-a9cb83948244",
+      "user_id": "08d91eba-1dc4-4339-92ed-7072c6022672",
+      "name": "Stark Industries",
+      "email": "pepper@stark.com",
+      "phone": "+1 555-0199",
+      "company": "Stark Industries LLC",
+      "address": "10880 Malibu Point, CA",
+      "created_at": "2026-09-19T08:54:13.481Z",
+      "updated_at": "2026-09-19T08:54:13.481Z"
+    }
+  ],
+  "invoices": [
+    {
+      "id": "10b1e8ed-89d5-4c8a-b949-3452a7df5bde",
+      "user_id": "88283756-9928-4e40-8df2-d5cc06317400",
+      "client_id": "59ca73b9-5a80-442d-81ae-46f4a752fc0c",
+      "invoice_number": "INV-1789668278751-001",
+      "amount": 2500,
+      "currency": "USD",
+      "issue_date": "2026-09-01",
+      "due_date": "2026-10-15",
+      "payment_status": "UNPAID",
+      "paid_date": null,
+      "notes": "Consulting services for Q3 automation",
+      "created_at": "2026-09-17T18:04:39.225Z",
+      "updated_at": "2026-09-17T18:04:39.225Z"
+    },
+    {
+      "id": "6c458471-8a7e-4326-a0db-0675f6a65710",
+      "user_id": "88283756-9928-4e40-8df2-d5cc06317400",
+      "client_id": "59ca73b9-5a80-442d-81ae-46f4a752fc0c",
+      "invoice_number": "INV-1789668278751-OVERDUE",
+      "amount": 1200,
+      "currency": "USD",
+      "issue_date": "2026-08-01",
+      "due_date": "2026-08-15",
+      "payment_status": "PAID",
+      "paid_date": "2026-09-17",
+      "notes": "Past due security review",
+      "created_at": "2026-09-17T18:04:39.237Z",
+      "updated_at": "2026-09-17T18:04:39.247Z"
+    },
+    {
+      "id": "d7299787-b913-45d7-ae92-42ffdbe930c2",
+      "user_id": "c5ceb912-6b57-4c10-a992-428e7d22b109",
+      "client_id": "4a2c55f2-8a02-4993-8b75-6965955b1b48",
+      "invoice_number": "INV-1789668282346-001",
+      "amount": 2500,
+      "currency": "USD",
+      "issue_date": "2026-09-01",
+      "due_date": "2026-10-15",
+      "payment_status": "UNPAID",
+      "paid_date": null,
+      "notes": "Consulting services for Q3 automation",
+      "created_at": "2026-09-17T18:04:42.744Z",
+      "updated_at": "2026-09-17T18:04:42.744Z"
+    },
+    {
+      "id": "d2c65b5c-e424-46f9-80aa-8a1a7884707e",
+      "user_id": "c5ceb912-6b57-4c10-a992-428e7d22b109",
+      "client_id": "4a2c55f2-8a02-4993-8b75-6965955b1b48",
+      "invoice_number": "INV-1789668282346-OVERDUE",
+      "amount": 1200,
+      "currency": "USD",
+      "issue_date": "2026-08-01",
+      "due_date": "2026-08-15",
+      "payment_status": "PAID",
+      "paid_date": "2026-09-17",
+      "notes": "Past due security review",
+      "created_at": "2026-09-17T18:04:42.755Z",
+      "updated_at": "2026-09-17T18:04:42.763Z"
+    },
+    {
+      "id": "eb7cfc78-9921-495b-ab45-7e73eeee7046",
+      "user_id": "44fb2beb-2e23-4b52-a5db-e6e2d4ff52ea",
+      "client_id": "dcc48336-db6b-4bd4-a49a-c21034908a90",
+      "invoice_number": "INV-1789670774933-001",
+      "amount": 2500,
+      "currency": "USD",
+      "issue_date": "2026-09-01",
+      "due_date": "2026-10-15",
+      "payment_status": "UNPAID",
+      "paid_date": null,
+      "notes": "Consulting services for Q3 automation",
+      "created_at": "2026-09-17T18:46:15.725Z",
+      "updated_at": "2026-09-17T18:46:15.725Z"
+    },
+    {
+      "id": "ca1fb942-8e17-47d4-8b90-cf2d597518d7",
+      "user_id": "44fb2beb-2e23-4b52-a5db-e6e2d4ff52ea",
+      "client_id": "dcc48336-db6b-4bd4-a49a-c21034908a90",
+      "invoice_number": "INV-1789670774933-OVERDUE",
+      "amount": 1200,
+      "currency": "USD",
+      "issue_date": "2026-08-01",
+      "due_date": "2026-08-15",
+      "payment_status": "PAID",
+      "paid_date": "2026-09-17",
+      "notes": "Past due security review",
+      "created_at": "2026-09-17T18:46:15.737Z",
+      "updated_at": "2026-09-17T18:46:15.749Z"
+    },
+    {
+      "id": "f0bb1c2e-103e-4793-b621-be6308adab0b",
+      "user_id": "d36c3629-9a70-4f6d-bccc-b421730a6577",
+      "client_id": "6a1c3c9e-c4b6-4b37-85cc-b2625998073a",
+      "invoice_number": "INV-1001",
+      "amount": 1500,
+      "currency": "USD",
+      "issue_date": "2026-09-01",
+      "due_date": "2026-09-10",
+      "payment_status": "OVERDUE",
+      "paid_date": null,
+      "notes": "Website revamp milestone",
+      "created_at": "2026-09-19T03:36:50.865Z",
+      "updated_at": "2026-09-19T03:36:50.865Z"
+    },
+    {
+      "id": "d11fdcd0-1ef9-4d71-a251-fb41a74608ac",
+      "user_id": "08d91eba-1dc4-4339-92ed-7072c6022672",
+      "client_id": "348f4c18-12e6-401b-b82f-a9cb83948244",
+      "invoice_number": "INV-1789808052855-001",
+      "amount": 2500,
+      "currency": "USD",
+      "issue_date": "2026-09-01",
+      "due_date": "2026-10-15",
+      "payment_status": "UNPAID",
+      "paid_date": null,
+      "notes": "Consulting services for Q3 automation",
+      "created_at": "2026-09-19T08:54:13.495Z",
+      "updated_at": "2026-09-19T08:54:13.495Z"
+    },
+    {
+      "id": "a29ea25e-3ad3-4361-ac6b-467396dffe64",
+      "user_id": "08d91eba-1dc4-4339-92ed-7072c6022672",
+      "client_id": "348f4c18-12e6-401b-b82f-a9cb83948244",
+      "invoice_number": "INV-1789808052855-OVERDUE",
+      "amount": 1200,
+      "currency": "USD",
+      "issue_date": "2026-08-01",
+      "due_date": "2026-08-15",
+      "payment_status": "PAID",
+      "paid_date": "2026-09-17",
+      "notes": "Past due security review",
+      "created_at": "2026-09-19T08:54:13.511Z",
+      "updated_at": "2026-09-19T08:54:13.522Z"
+    }
+  ],
+  "reminders": [
+    {
+      "id": "8e5d2771-44d9-4275-a6b6-16c39c752df0",
+      "user_id": "88283756-9928-4e40-8df2-d5cc06317400",
+      "invoice_id": "10b1e8ed-89d5-4c8a-b949-3452a7df5bde",
+      "client_id": "59ca73b9-5a80-442d-81ae-46f4a752fc0c",
+      "recipient_email": "pepper@stark.com",
+      "subject": "Invoice INV-1789668278751-001 Payment Reminder from Pilot Consulting Ltd",
+      "message": "Pilot Consulting Ltd - Friendly Payment Reminder\nInvoice: #INV-1789668278751-001\nDear Stark Industries,\n\nWe hope you are having a wonderful week. This is a gentle reminder that invoice #INV-1789668278751-001 is due on 2026-10-15.\n\n\nInvoice Number: #INV-1789668278751-001\nDue Date: 2026-10-15\nAmount Due: USD 2500.00\n\nIf payment has already been sent, please disregard this notice.\n\nBest regards,\nPilot Consulting Ltd",
+      "sent_at": "2026-09-17T18:04:39.261Z",
+      "status": "CONFIG_REQUIRED",
+      "error_message": "Email service is not configured (RESEND_API_KEY is unset). Reminder draft generated for manual review."
+    },
+    {
+      "id": "c65fe932-c59f-41d7-b7f0-f5a7d24c5364",
+      "user_id": "c5ceb912-6b57-4c10-a992-428e7d22b109",
+      "invoice_id": "d7299787-b913-45d7-ae92-42ffdbe930c2",
+      "client_id": "4a2c55f2-8a02-4993-8b75-6965955b1b48",
+      "recipient_email": "pepper@stark.com",
+      "subject": "Invoice INV-1789668282346-001 Payment Reminder from Pilot Consulting Ltd",
+      "message": "Pilot Consulting Ltd - Friendly Payment Reminder\nInvoice: #INV-1789668282346-001\nDear Stark Industries,\n\nWe hope you are having a wonderful week. This is a gentle reminder that invoice #INV-1789668282346-001 is due on 2026-10-15.\n\n\nInvoice Number: #INV-1789668282346-001\nDue Date: 2026-10-15\nAmount Due: USD 2500.00\n\nIf payment has already been sent, please disregard this notice.\n\nBest regards,\nPilot Consulting Ltd",
+      "sent_at": "2026-09-17T18:04:42.773Z",
+      "status": "CONFIG_REQUIRED",
+      "error_message": "Email service is not configured (RESEND_API_KEY is unset). Reminder draft generated for manual review."
+    },
+    {
+      "id": "50a36bb3-c786-4236-bed1-627b32cb13f9",
+      "user_id": "44fb2beb-2e23-4b52-a5db-e6e2d4ff52ea",
+      "invoice_id": "eb7cfc78-9921-495b-ab45-7e73eeee7046",
+      "client_id": "dcc48336-db6b-4bd4-a49a-c21034908a90",
+      "recipient_email": "pepper@stark.com",
+      "subject": "Invoice INV-1789670774933-001 Payment Reminder from Pilot Consulting Ltd",
+      "message": "Pilot Consulting Ltd - Friendly Payment Reminder\nInvoice: #INV-1789670774933-001\nDear Stark Industries,\n\nWe hope you are having a wonderful week. This is a gentle reminder that invoice #INV-1789670774933-001 is due on 2026-10-15.\n\n\nInvoice Number: #INV-1789670774933-001\nDue Date: 2026-10-15\nAmount Due: USD 2500.00\n\nIf payment has already been sent, please disregard this notice.\n\nBest regards,\nPilot Consulting Ltd",
+      "sent_at": "2026-09-17T18:46:15.868Z",
+      "status": "FAILED",
+      "error_message": "API key is invalid"
+    },
+    {
+      "id": "9796d8a6-bd87-4599-8796-3236837b679f",
+      "user_id": "08d91eba-1dc4-4339-92ed-7072c6022672",
+      "invoice_id": "d11fdcd0-1ef9-4d71-a251-fb41a74608ac",
+      "client_id": "348f4c18-12e6-401b-b82f-a9cb83948244",
+      "recipient_email": "pepper@stark.com",
+      "subject": "Invoice INV-1789808052855-001 Payment Reminder from Pilot Consulting Ltd",
+      "message": "Pilot Consulting Ltd - Friendly Payment Reminder\nInvoice: #INV-1789808052855-001\nDear Stark Industries,\n\nWe hope you are having a wonderful week. This is a gentle reminder that invoice #INV-1789808052855-001 is due on 2026-10-15.\n\n\nInvoice Number: #INV-1789808052855-001\nDue Date: 2026-10-15\nAmount Due: USD 2500.00\n\nIf payment has already been sent, please disregard this notice.\n\nBest regards,\nPilot Consulting Ltd",
+      "sent_at": "2026-09-19T08:54:13.635Z",
+      "status": "FAILED",
+      "error_message": "API key is invalid"
+    }
+  ],
+  "activity_logs": [
+    {
+      "id": "57dfa726-3cea-46cc-96c1-4b13ed604373",
+      "user_id": "7f63539d-41a6-4937-a2e7-2bbf81fd260c",
+      "action": "USER_REGISTERED",
+      "details": "Account registered for intruder_1789808052855@receipto.test (Pending Email Verification)",
+      "metadata": {
+        "email": "intruder_1789808052855@receipto.test"
+      },
+      "created_at": "2026-09-19T08:54:13.882Z"
+    },
+    {
+      "id": "88a71ff5-b26e-4331-8d2d-7fd0606551b7",
+      "user_id": "08d91eba-1dc4-4339-92ed-7072c6022672",
+      "action": "REMINDER_TRIGGERED",
+      "details": "Triggered reminder for invoice #INV-1789808052855-001 to pepper@stark.com (FAILED)",
+      "metadata": {
+        "reminderId": "9796d8a6-bd87-4599-8796-3236837b679f",
+        "status": "FAILED",
+        "configured": true
+      },
+      "created_at": "2026-09-19T08:54:13.636Z"
+    },
+    {
+      "id": "f234aa52-dcfa-4009-8c99-e284be70d999",
+      "user_id": "08d91eba-1dc4-4339-92ed-7072c6022672",
+      "action": "INVOICE_PAID",
+      "details": "Marked invoice #INV-1789808052855-OVERDUE as PAID (USD 1200)",
+      "metadata": {
+        "invoiceId": "a29ea25e-3ad3-4361-ac6b-467396dffe64",
+        "amount": 1200
+      },
+      "created_at": "2026-09-19T08:54:13.523Z"
+    },
+    {
+      "id": "d0e60d8c-bbd7-4b7f-bce0-f65d22de7b53",
+      "user_id": "08d91eba-1dc4-4339-92ed-7072c6022672",
+      "action": "INVOICE_CREATED",
+      "details": "Created invoice #INV-1789808052855-OVERDUE for Stark Industries (USD 1200)",
+      "metadata": {
+        "invoiceId": "a29ea25e-3ad3-4361-ac6b-467396dffe64",
+        "amount": 1200,
+        "status": "OVERDUE"
+      },
+      "created_at": "2026-09-19T08:54:13.512Z"
+    },
+    {
+      "id": "95c86e5a-b6d6-4b1d-8eb2-dcf11c55279b",
+      "user_id": "08d91eba-1dc4-4339-92ed-7072c6022672",
+      "action": "INVOICE_CREATED",
+      "details": "Created invoice #INV-1789808052855-001 for Stark Industries (USD 2500)",
+      "metadata": {
+        "invoiceId": "d11fdcd0-1ef9-4d71-a251-fb41a74608ac",
+        "amount": 2500,
+        "status": "UNPAID"
+      },
+      "created_at": "2026-09-19T08:54:13.496Z"
+    },
+    {
+      "id": "1cbcac2d-96fd-4a28-afd4-63cb7d60c101",
+      "user_id": "08d91eba-1dc4-4339-92ed-7072c6022672",
+      "action": "CLIENT_CREATED",
+      "details": "Added client Stark Industries (pepper@stark.com)",
+      "metadata": {
+        "clientId": "348f4c18-12e6-401b-b82f-a9cb83948244"
+      },
+      "created_at": "2026-09-19T08:54:13.481Z"
+    },
+    {
+      "id": "ec355fb0-e7a2-421d-95b6-4309f624b909",
+      "user_id": "08d91eba-1dc4-4339-92ed-7072c6022672",
+      "action": "USER_REGISTERED",
+      "details": "Account registered for engineer_1789808052855@receipto.test (Pending Email Verification)",
+      "metadata": {
+        "email": "engineer_1789808052855@receipto.test"
+      },
+      "created_at": "2026-09-19T08:54:13.186Z"
+    },
+    {
+      "id": "a8a315f3-fb1b-432a-86dc-1c43e98d4c6b",
+      "user_id": "d36c3629-9a70-4f6d-bccc-b421730a6577",
+      "action": "INVOICE_CREATED",
+      "details": "Created invoice #INV-1001 for Acme Corp (USD 1500)",
+      "metadata": {
+        "invoiceId": "f0bb1c2e-103e-4793-b621-be6308adab0b",
+        "amount": 1500,
+        "status": "OVERDUE"
+      },
+      "created_at": "2026-09-19T03:36:50.866Z"
+    },
+    {
+      "id": "88dbda6f-fcd3-409f-be04-66979da18896",
+      "user_id": "d36c3629-9a70-4f6d-bccc-b421730a6577",
+      "action": "CLIENT_CREATED",
+      "details": "Added client Acme Corp (billing@acmecorp.com)",
+      "metadata": {
+        "clientId": "6a1c3c9e-c4b6-4b37-85cc-b2625998073a"
+      },
+      "created_at": "2026-09-19T03:36:50.860Z"
+    },
+    {
+      "id": "3a6aede7-c82e-4b8c-8102-c49f327822d2",
+      "user_id": "d36c3629-9a70-4f6d-bccc-b421730a6577",
+      "action": "EMAIL_VERIFIED",
+      "details": "User email user2_1789789010350@example.com verified successfully.",
+      "created_at": "2026-09-19T03:36:50.853Z"
+    },
+    {
+      "id": "a8c4ec85-17ce-41e3-b5e6-68a99f287cd9",
+      "user_id": "d36c3629-9a70-4f6d-bccc-b421730a6577",
+      "action": "USER_REGISTERED",
+      "details": "Account registered for user2_1789789010350@example.com (Pending Email Verification)",
+      "metadata": {
+        "email": "user2_1789789010350@example.com"
+      },
+      "created_at": "2026-09-19T03:36:50.844Z"
+    },
+    {
+      "id": "e6b07070-d5f9-4274-8543-dbc4c4cc457e",
+      "user_id": "445f5922-392e-40e0-8b83-717ea41ddcf4",
+      "action": "CLIENT_CREATED",
+      "details": "Added client Acme Corp (billing@acmecorp.com)",
+      "metadata": {
+        "clientId": "68545beb-e393-4da0-8875-7e18018f14af"
+      },
+      "created_at": "2026-09-19T03:36:30.500Z"
+    },
+    {
+      "id": "e5fb2134-3bc7-4d95-b6fb-1656060c028a",
+      "user_id": "445f5922-392e-40e0-8b83-717ea41ddcf4",
+      "action": "EMAIL_VERIFIED",
+      "details": "User email user_1789788990240@example.com verified successfully.",
+      "created_at": "2026-09-19T03:36:30.486Z"
+    },
+    {
+      "id": "be924653-b6d7-416e-8030-fb5ff430d2f2",
+      "user_id": "445f5922-392e-40e0-8b83-717ea41ddcf4",
+      "action": "USER_REGISTERED",
+      "details": "Account registered for user_1789788990240@example.com (Pending Email Verification)",
+      "metadata": {
+        "email": "user_1789788990240@example.com"
+      },
+      "created_at": "2026-09-19T03:36:30.478Z"
+    },
+    {
+      "id": "b0503500-a704-4cfe-adb8-f874fbd6de66",
+      "user_id": "e36e120b-7785-411d-96f9-5ac2f2a1b6b7",
+      "action": "EMAIL_VERIFIED",
+      "details": "User email corrected_1789788985698@example.com verified successfully.",
+      "created_at": "2026-09-19T03:36:25.804Z"
+    },
+    {
+      "id": "d037cb33-21d5-485d-97fd-f7867474c247",
+      "user_id": "e36e120b-7785-411d-96f9-5ac2f2a1b6b7",
+      "action": "USER_REGISTERED",
+      "details": "Account registered for test_1789788985124@example.com (Pending Email Verification)",
+      "metadata": {
+        "email": "test_1789788985124@example.com"
+      },
+      "created_at": "2026-09-19T03:36:25.681Z"
+    },
+    {
+      "id": "9336d472-ee4d-470a-a213-eef1241fa029",
+      "user_id": "8018ff99-6a3d-40cb-9fc8-ff8dc30efea0",
+      "action": "USER_REGISTERED",
+      "details": "Account registered for test_1789788978242@example.com (Pending Email Verification)",
+      "metadata": {
+        "email": "test_1789788978242@example.com"
+      },
+      "created_at": "2026-09-19T03:36:18.569Z"
+    },
+    {
+      "id": "411064b2-1421-4bf0-81ce-61d6dc0027e5",
+      "user_id": "3ce460dc-6ac3-46e8-abc6-8714fea0a316",
+      "action": "USER_REGISTERED",
+      "details": "Account registered for intruder_1789670774933@receipto.test (Pending Email Verification)",
+      "metadata": {
+        "email": "intruder_1789670774933@receipto.test"
+      },
+      "created_at": "2026-09-17T18:46:16.083Z"
+    },
+    {
+      "id": "d4c63f93-e7ee-4775-8e39-9388db2a28f5",
+      "user_id": "44fb2beb-2e23-4b52-a5db-e6e2d4ff52ea",
+      "action": "REMINDER_TRIGGERED",
+      "details": "Triggered reminder for invoice #INV-1789670774933-001 to pepper@stark.com (FAILED)",
+      "metadata": {
+        "reminderId": "50a36bb3-c786-4236-bed1-627b32cb13f9",
+        "status": "FAILED",
+        "configured": true
+      },
+      "created_at": "2026-09-17T18:46:15.868Z"
+    },
+    {
+      "id": "5d8972fc-0fcf-490a-8279-35dfb6687021",
+      "user_id": "44fb2beb-2e23-4b52-a5db-e6e2d4ff52ea",
+      "action": "INVOICE_PAID",
+      "details": "Marked invoice #INV-1789670774933-OVERDUE as PAID (USD 1200)",
+      "metadata": {
+        "invoiceId": "ca1fb942-8e17-47d4-8b90-cf2d597518d7",
+        "amount": 1200
+      },
+      "created_at": "2026-09-17T18:46:15.749Z"
+    },
+    {
+      "id": "c1831f02-d79f-4922-956d-ab8d28c1cfaf",
+      "user_id": "44fb2beb-2e23-4b52-a5db-e6e2d4ff52ea",
+      "action": "INVOICE_CREATED",
+      "details": "Created invoice #INV-1789670774933-OVERDUE for Stark Industries (USD 1200)",
+      "metadata": {
+        "invoiceId": "ca1fb942-8e17-47d4-8b90-cf2d597518d7",
+        "amount": 1200,
+        "status": "OVERDUE"
+      },
+      "created_at": "2026-09-17T18:46:15.737Z"
+    },
+    {
+      "id": "d3dfd150-1431-4e06-8414-bd24699ca47f",
+      "user_id": "44fb2beb-2e23-4b52-a5db-e6e2d4ff52ea",
+      "action": "INVOICE_CREATED",
+      "details": "Created invoice #INV-1789670774933-001 for Stark Industries (USD 2500)",
+      "metadata": {
+        "invoiceId": "eb7cfc78-9921-495b-ab45-7e73eeee7046",
+        "amount": 2500,
+        "status": "UNPAID"
+      },
+      "created_at": "2026-09-17T18:46:15.725Z"
+    },
+    {
+      "id": "ccae76bf-b901-4c49-8066-1f4328dfa6f0",
+      "user_id": "44fb2beb-2e23-4b52-a5db-e6e2d4ff52ea",
+      "action": "CLIENT_CREATED",
+      "details": "Added client Stark Industries (pepper@stark.com)",
+      "metadata": {
+        "clientId": "dcc48336-db6b-4bd4-a49a-c21034908a90"
+      },
+      "created_at": "2026-09-17T18:46:15.714Z"
+    },
+    {
+      "id": "1bc6b172-20d8-4e63-8870-9ec24e5c2aca",
+      "user_id": "44fb2beb-2e23-4b52-a5db-e6e2d4ff52ea",
+      "action": "USER_REGISTERED",
+      "details": "Account registered for engineer_1789670774933@receipto.test (Pending Email Verification)",
+      "metadata": {
+        "email": "engineer_1789670774933@receipto.test"
+      },
+      "created_at": "2026-09-17T18:46:15.454Z"
+    },
+    {
+      "id": "7cdd0a0c-fd46-461b-9d7f-cdbbe3d28f74",
+      "user_id": "8fd74083-921a-487f-a66e-ef128c82c963",
+      "action": "USER_REGISTERED",
+      "details": "Account registered for test_pilot_1789669585587@example.com (Pending Email Verification)",
+      "metadata": {
+        "email": "test_pilot_1789669585587@example.com"
+      },
+      "created_at": "2026-09-17T18:26:26.329Z"
+    },
+    {
+      "id": "f9011fce-1cb1-4d76-b2a3-eabf0815942e",
+      "user_id": "f903e1a7-8712-4256-ba87-80d54a6b9074",
+      "action": "USER_REGISTERED",
+      "details": "Account registered for shimelisyilma04@gmail.com",
+      "metadata": {
+        "email": "shimelisyilma04@gmail.com"
+      },
+      "created_at": "2026-09-17T18:07:27.575Z"
+    },
+    {
+      "id": "f2590350-2902-43d6-8923-0fc4dec29879",
+      "user_id": "800666a0-14f7-4839-88eb-a0dd7e8f303d",
+      "action": "USER_REGISTERED",
+      "details": "Account registered for intruder_1789668282346@invoicepilot.test",
+      "metadata": {
+        "email": "intruder_1789668282346@invoicepilot.test"
+      },
+      "created_at": "2026-09-17T18:04:42.916Z"
+    },
+    {
+      "id": "88c0c9dd-17c3-43bd-aacf-86be0e166cb9",
+      "user_id": "c5ceb912-6b57-4c10-a992-428e7d22b109",
+      "action": "REMINDER_TRIGGERED",
+      "details": "Triggered reminder for invoice #INV-1789668282346-001 to pepper@stark.com (CONFIG_REQUIRED)",
+      "metadata": {
+        "reminderId": "c65fe932-c59f-41d7-b7f0-f5a7d24c5364",
+        "status": "CONFIG_REQUIRED",
+        "configured": false
+      },
+      "created_at": "2026-09-17T18:04:42.773Z"
+    },
+    {
+      "id": "28ff240f-5b26-4859-9710-b40434d346f8",
+      "user_id": "c5ceb912-6b57-4c10-a992-428e7d22b109",
+      "action": "INVOICE_PAID",
+      "details": "Marked invoice #INV-1789668282346-OVERDUE as PAID (USD 1200)",
+      "metadata": {
+        "invoiceId": "d2c65b5c-e424-46f9-80aa-8a1a7884707e",
+        "amount": 1200
+      },
+      "created_at": "2026-09-17T18:04:42.763Z"
+    },
+    {
+      "id": "577652fb-5dba-4c85-ace0-743b9745a0c0",
+      "user_id": "c5ceb912-6b57-4c10-a992-428e7d22b109",
+      "action": "INVOICE_CREATED",
+      "details": "Created invoice #INV-1789668282346-OVERDUE for Stark Industries (USD 1200)",
+      "metadata": {
+        "invoiceId": "d2c65b5c-e424-46f9-80aa-8a1a7884707e",
+        "amount": 1200,
+        "status": "OVERDUE"
+      },
+      "created_at": "2026-09-17T18:04:42.755Z"
+    },
+    {
+      "id": "bf4341c7-dba4-449a-b482-3fb799509cfa",
+      "user_id": "c5ceb912-6b57-4c10-a992-428e7d22b109",
+      "action": "INVOICE_CREATED",
+      "details": "Created invoice #INV-1789668282346-001 for Stark Industries (USD 2500)",
+      "metadata": {
+        "invoiceId": "d7299787-b913-45d7-ae92-42ffdbe930c2",
+        "amount": 2500,
+        "status": "UNPAID"
+      },
+      "created_at": "2026-09-17T18:04:42.745Z"
+    },
+    {
+      "id": "28eab972-ffec-43da-a1f4-5e09f7ea66d2",
+      "user_id": "c5ceb912-6b57-4c10-a992-428e7d22b109",
+      "action": "CLIENT_CREATED",
+      "details": "Added client Stark Industries (pepper@stark.com)",
+      "metadata": {
+        "clientId": "4a2c55f2-8a02-4993-8b75-6965955b1b48"
+      },
+      "created_at": "2026-09-17T18:04:42.737Z"
+    },
+    {
+      "id": "2518cfca-042f-4298-9e25-22152ce24642",
+      "user_id": "c5ceb912-6b57-4c10-a992-428e7d22b109",
+      "action": "USER_LOGGED_IN",
+      "details": "User logged in from 127.0.0.1",
+      "created_at": "2026-09-17T18:04:42.727Z"
+    },
+    {
+      "id": "a28f27c4-50e1-4c1c-ab0f-0e802f677b64",
+      "user_id": "c5ceb912-6b57-4c10-a992-428e7d22b109",
+      "action": "USER_REGISTERED",
+      "details": "Account registered for engineer_1789668282346@invoicepilot.test",
+      "metadata": {
+        "email": "engineer_1789668282346@invoicepilot.test"
+      },
+      "created_at": "2026-09-17T18:04:42.488Z"
+    },
+    {
+      "id": "dc11887e-3bae-452f-af08-b3d077ad5d6d",
+      "user_id": "5d09d751-4caa-439e-9f66-c0b1c456e922",
+      "action": "USER_REGISTERED",
+      "details": "Account registered for intruder_1789668278751@invoicepilot.test",
+      "metadata": {
+        "email": "intruder_1789668278751@invoicepilot.test"
+      },
+      "created_at": "2026-09-17T18:04:39.378Z"
+    },
+    {
+      "id": "7c6c35bd-d8cb-4fde-aa07-d745fc8f4d5c",
+      "user_id": "88283756-9928-4e40-8df2-d5cc06317400",
+      "action": "REMINDER_TRIGGERED",
+      "details": "Triggered reminder for invoice #INV-1789668278751-001 to pepper@stark.com (CONFIG_REQUIRED)",
+      "metadata": {
+        "reminderId": "8e5d2771-44d9-4275-a6b6-16c39c752df0",
+        "status": "CONFIG_REQUIRED",
+        "configured": false
+      },
+      "created_at": "2026-09-17T18:04:39.261Z"
+    },
+    {
+      "id": "0fdd789b-1275-4f53-a662-a8eff85e5843",
+      "user_id": "88283756-9928-4e40-8df2-d5cc06317400",
+      "action": "INVOICE_PAID",
+      "details": "Marked invoice #INV-1789668278751-OVERDUE as PAID (USD 1200)",
+      "metadata": {
+        "invoiceId": "6c458471-8a7e-4326-a0db-0675f6a65710",
+        "amount": 1200
+      },
+      "created_at": "2026-09-17T18:04:39.248Z"
+    },
+    {
+      "id": "70b21a2a-6b17-4c5a-8594-05ffa006af5a",
+      "user_id": "88283756-9928-4e40-8df2-d5cc06317400",
+      "action": "INVOICE_CREATED",
+      "details": "Created invoice #INV-1789668278751-OVERDUE for Stark Industries (USD 1200)",
+      "metadata": {
+        "invoiceId": "6c458471-8a7e-4326-a0db-0675f6a65710",
+        "amount": 1200,
+        "status": "OVERDUE"
+      },
+      "created_at": "2026-09-17T18:04:39.237Z"
+    },
+    {
+      "id": "d8f7f0a2-11e6-4e5a-8e59-f13707182e02",
+      "user_id": "88283756-9928-4e40-8df2-d5cc06317400",
+      "action": "INVOICE_CREATED",
+      "details": "Created invoice #INV-1789668278751-001 for Stark Industries (USD 2500)",
+      "metadata": {
+        "invoiceId": "10b1e8ed-89d5-4c8a-b949-3452a7df5bde",
+        "amount": 2500,
+        "status": "UNPAID"
+      },
+      "created_at": "2026-09-17T18:04:39.225Z"
+    },
+    {
+      "id": "57a4323e-8d87-4e32-978d-50a5a4abc671",
+      "user_id": "88283756-9928-4e40-8df2-d5cc06317400",
+      "action": "CLIENT_CREATED",
+      "details": "Added client Stark Industries (pepper@stark.com)",
+      "metadata": {
+        "clientId": "59ca73b9-5a80-442d-81ae-46f4a752fc0c"
+      },
+      "created_at": "2026-09-17T18:04:39.213Z"
+    },
+    {
+      "id": "2ffa6d55-d7ab-40b4-a2f6-d8c59e5de28c",
+      "user_id": "88283756-9928-4e40-8df2-d5cc06317400",
+      "action": "USER_LOGGED_IN",
+      "details": "User logged in from 127.0.0.1",
+      "created_at": "2026-09-17T18:04:39.201Z"
+    },
+    {
+      "id": "7478793d-8f97-4bca-bc4f-5b8704d51c6a",
+      "user_id": "88283756-9928-4e40-8df2-d5cc06317400",
+      "action": "USER_REGISTERED",
+      "details": "Account registered for engineer_1789668278751@invoicepilot.test",
+      "metadata": {
+        "email": "engineer_1789668278751@invoicepilot.test"
+      },
+      "created_at": "2026-09-17T18:04:38.956Z"
+    }
+  ],
+  "email_verifications": [
+    {
+      "id": "63377e06-1c94-4891-a85b-63ccdc86672e",
+      "user_id": "8fd74083-921a-487f-a66e-ef128c82c963",
+      "email": "test_pilot_1789669585587@example.com",
+      "otp_hash": "d803da67dfcdbdc73033deee6b3556ec2d5c20e3ee608a999b887cf220969e6d",
+      "salt": "8c097675c47de030c21eda32d3295170",
+      "created_at": "2026-09-17T18:26:25.904Z",
+      "expires_at": "2026-09-17T18:36:25.904Z",
+      "attempt_count": 0,
+      "used_at": null,
+      "purpose": "email_verification",
+      "resend_count": 0,
+      "last_resend_at": "2026-09-17T18:26:25.904Z"
+    },
+    {
+      "id": "16d71240-de1e-4fac-b868-ef92eed0f578",
+      "user_id": "44fb2beb-2e23-4b52-a5db-e6e2d4ff52ea",
+      "email": "engineer_1789670774933@receipto.test",
+      "otp_hash": "4109b92339256ed0e41b4b240fcf0bfcaebb3616c3bce928ff03a0e9e571c254",
+      "salt": "5784cc7b2521ebe7cfe9e650436cb8ae",
+      "created_at": "2026-09-17T18:46:15.078Z",
+      "expires_at": "2026-09-17T18:56:15.078Z",
+      "attempt_count": 0,
+      "used_at": null,
+      "purpose": "email_verification",
+      "resend_count": 0,
+      "last_resend_at": "2026-09-17T18:46:15.078Z"
+    },
+    {
+      "id": "b3d6ad5f-accb-4b07-a8e4-323e602f71e2",
+      "user_id": "3ce460dc-6ac3-46e8-abc6-8714fea0a316",
+      "email": "intruder_1789670774933@receipto.test",
+      "otp_hash": "ba5001d89a79b468f962180aeee0c34285dc3e572f71b619c3192c1e88f16bed",
+      "salt": "9648b3d4369e76623c5aabaa8bbf4d8e",
+      "created_at": "2026-09-17T18:46:15.983Z",
+      "expires_at": "2026-09-17T18:56:15.983Z",
+      "attempt_count": 0,
+      "used_at": null,
+      "purpose": "email_verification",
+      "resend_count": 0,
+      "last_resend_at": "2026-09-17T18:46:15.983Z"
+    },
+    {
+      "id": "bed5a9e7-2603-4896-b361-80f49e5194c5",
+      "user_id": "8018ff99-6a3d-40cb-9fc8-ff8dc30efea0",
+      "email": "test_1789788978242@example.com",
+      "otp_hash": "027b59a1d93dfef2db310978823d5aa407713f05f47afc9a008376b5c3151d77",
+      "salt": "27064b4a75fbc0971c63c628359b89a3",
+      "created_at": "2026-09-19T03:36:18.410Z",
+      "expires_at": "2026-09-19T03:46:18.410Z",
+      "attempt_count": 1,
+      "used_at": "SUPERSEDED",
+      "purpose": "email_verification",
+      "resend_count": 0,
+      "last_resend_at": "2026-09-19T03:36:18.410Z"
+    },
+    {
+      "id": "81a10cf6-6d67-4126-8899-eba3970bf144",
+      "user_id": "8018ff99-6a3d-40cb-9fc8-ff8dc30efea0",
+      "email": "corrected_1789788978584@example.com",
+      "otp_hash": "797c0ce9848fe8e6d3a8eb2fd331895a9709bd4e4582fa0f14d5243f25864e79",
+      "salt": "10f872ef21eca6aced9129b4a32bb9c1",
+      "created_at": "2026-09-19T03:36:18.587Z",
+      "expires_at": "2026-09-19T03:46:18.587Z",
+      "attempt_count": 0,
+      "used_at": null,
+      "purpose": "email_verification",
+      "resend_count": 0,
+      "last_resend_at": "2026-09-19T03:36:18.587Z"
+    },
+    {
+      "id": "06809559-7a1b-44d6-992f-e4b4ccdb740a",
+      "user_id": "e36e120b-7785-411d-96f9-5ac2f2a1b6b7",
+      "email": "test_1789788985124@example.com",
+      "otp_hash": "c28be2ff102da3094da91500d78d576fdecb088bb90358c09d70f89306bda4a9",
+      "salt": "6a82a59f856411634af98d1567cce9e1",
+      "created_at": "2026-09-19T03:36:25.286Z",
+      "expires_at": "2026-09-19T03:46:25.286Z",
+      "attempt_count": 1,
+      "used_at": "SUPERSEDED",
+      "purpose": "email_verification",
+      "resend_count": 0,
+      "last_resend_at": "2026-09-19T03:36:25.286Z"
+    },
+    {
+      "id": "3b8bd199-5772-47c2-8ea7-f5eacbe35c93",
+      "user_id": "e36e120b-7785-411d-96f9-5ac2f2a1b6b7",
+      "email": "corrected_1789788985698@example.com",
+      "otp_hash": "ce53c83845ab459e5027fa376ee49b7179d41a42bd741b3d7e47fe13b0a23e45",
+      "salt": "0e8f4f987655237d4e4a2572a10f625b",
+      "created_at": "2026-09-19T03:36:25.700Z",
+      "expires_at": "2026-09-19T03:46:25.700Z",
+      "attempt_count": 1,
+      "used_at": "2026-09-19T03:36:25.803Z",
+      "purpose": "email_verification",
+      "resend_count": 0,
+      "last_resend_at": "2026-09-19T03:36:25.700Z"
+    },
+    {
+      "id": "a8178e63-5d62-43fb-8f75-4c33b3426a6b",
+      "user_id": "445f5922-392e-40e0-8b83-717ea41ddcf4",
+      "email": "user_1789788990240@example.com",
+      "otp_hash": "3fbcfc7848a1042e03d447551227d89038ab7e7e9402c5d0ef2bef6193381682",
+      "salt": "b023a8c4019e4e4170602060adbac606",
+      "created_at": "2026-09-19T03:36:30.363Z",
+      "expires_at": "2026-09-19T03:46:30.362Z",
+      "attempt_count": 1,
+      "used_at": "2026-09-19T03:36:30.486Z",
+      "purpose": "email_verification",
+      "resend_count": 0,
+      "last_resend_at": "2026-09-19T03:36:30.363Z"
+    },
+    {
+      "id": "946f5773-0ab2-49ca-8830-c1ddb27dbd8f",
+      "user_id": "d36c3629-9a70-4f6d-bccc-b421730a6577",
+      "email": "user2_1789789010350@example.com",
+      "otp_hash": "922c7685772e01754d69ce74541f61b15e82313031f2781c373ad3f2b4b6a4b1",
+      "salt": "fc81937f3fe961f51c6d6881ea0dca3b",
+      "created_at": "2026-09-19T03:36:50.476Z",
+      "expires_at": "2026-09-19T03:46:50.476Z",
+      "attempt_count": 1,
+      "used_at": "2026-09-19T03:36:50.852Z",
+      "purpose": "email_verification",
+      "resend_count": 0,
+      "last_resend_at": "2026-09-19T03:36:50.476Z"
+    },
+    {
+      "id": "652ffb53-9130-438d-9290-339240d44584",
+      "user_id": "08d91eba-1dc4-4339-92ed-7072c6022672",
+      "email": "engineer_1789808052855@receipto.test",
+      "otp_hash": "8db3e82012a4396f098f726f8f8b79db83192c25076ac3264ccc089d2e87a5d7",
+      "salt": "9b687bb537f086bc5a4120e888e1ae41",
+      "created_at": "2026-09-19T08:54:13.034Z",
+      "expires_at": "2026-09-19T09:04:13.034Z",
+      "attempt_count": 0,
+      "used_at": null,
+      "purpose": "email_verification",
+      "resend_count": 0,
+      "last_resend_at": "2026-09-19T08:54:13.034Z"
+    },
+    {
+      "id": "21fa7703-a421-4b29-a92a-c94a95c9ff5d",
+      "user_id": "7f63539d-41a6-4937-a2e7-2bbf81fd260c",
+      "email": "intruder_1789808052855@receipto.test",
+      "otp_hash": "e696c3943e3ad6ecfae6bbc5fb0eea3cfeae46c2570642bcdc6207e3892a6482",
+      "salt": "52ea06ba7a654ac451f08be66c7a3071",
+      "created_at": "2026-09-19T08:54:13.782Z",
+      "expires_at": "2026-09-19T09:04:13.782Z",
+      "attempt_count": 0,
+      "used_at": null,
+      "purpose": "email_verification",
+      "resend_count": 0,
+      "last_resend_at": "2026-09-19T08:54:13.782Z"
+    }
+  ],
+  "subscriptions": [
+    {
+      "id": "6c3c0e25-3e40-47d2-b4cb-b5176dcb5fa2",
+      "user_id": "445f5922-392e-40e0-8b83-717ea41ddcf4",
+      "plan": "FREE",
+      "status": "active",
+      "billing_interval": "monthly",
+      "provider": "manual",
+      "provider_customer_id": null,
+      "provider_subscription_id": null,
+      "current_period_start": "2026-09-19T03:36:30.498Z",
+      "current_period_end": null,
+      "cancel_at_period_end": false,
+      "created_at": "2026-09-19T03:36:30.498Z",
+      "updated_at": "2026-09-19T03:36:30.498Z"
+    },
+    {
+      "id": "149a0b10-f359-41a7-8f42-c0ab44286171",
+      "user_id": "d36c3629-9a70-4f6d-bccc-b421730a6577",
+      "plan": "FREE",
+      "status": "active",
+      "billing_interval": "monthly",
+      "provider": "manual",
+      "provider_customer_id": null,
+      "provider_subscription_id": null,
+      "current_period_start": "2026-09-19T03:36:50.858Z",
+      "current_period_end": null,
+      "cancel_at_period_end": false,
+      "created_at": "2026-09-19T03:36:50.858Z",
+      "updated_at": "2026-09-19T03:36:50.858Z"
+    },
+    {
+      "id": "36fb15b1-195b-4a2e-9b6d-dd5e640922c1",
+      "user_id": "08d91eba-1dc4-4339-92ed-7072c6022672",
+      "plan": "FREE",
+      "status": "active",
+      "billing_interval": "monthly",
+      "provider": "manual",
+      "provider_customer_id": null,
+      "provider_subscription_id": null,
+      "current_period_start": "2026-09-19T08:54:13.479Z",
+      "current_period_end": null,
+      "cancel_at_period_end": false,
+      "created_at": "2026-09-19T08:54:13.479Z",
+      "updated_at": "2026-09-19T08:54:13.479Z"
+    }
+  ],
+  "processed_webhook_events": []
+}

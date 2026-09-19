@@ -1,0 +1,6 @@
+{
+  "name": "Receipto",
+  "description": "Receipto helps businesses track invoices, identify overdue payments, and follow up with customers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
