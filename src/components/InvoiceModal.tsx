@@ -19,8 +19,6 @@ export function InvoiceModal({
   initialInvoice,
   onOpenCreateClient,
 }: InvoiceModalProps) {
-  if (!isOpen) return null;
-
   const todayStr = new Date().toISOString().split('T')[0];
   const in14DaysStr = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
@@ -49,6 +47,8 @@ export function InvoiceModal({
       setClientId(clients[0].id);
     }
   }, [initialInvoice, clients]);
+
+  if (!isOpen) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

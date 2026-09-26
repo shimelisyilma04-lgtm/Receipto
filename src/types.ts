@@ -12,8 +12,11 @@ export interface Subscription {
   status: import('./plans.js').SubscriptionStatus;
   billing_interval: import('./plans.js').BillingInterval;
   provider: import('./plans.js').SubscriptionProvider;
+  access_mode?: import('./plans.js').AccessMode;
   provider_customer_id: string | null;
   provider_subscription_id: string | null;
+  paddle_customer_id?: string | null;
+  paddle_subscription_id?: string | null;
   current_period_start: string;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
@@ -24,8 +27,10 @@ export interface Subscription {
 export interface SubscriptionUsage {
   client_count: number;
   max_clients: number | null;
+  clients_remaining: number | null;
   invoices_this_period: number;
   max_invoices_per_month: number | null;
+  invoices_remaining: number | null;
   period_start: string;
   period_end: string | null;
   automated_reminders_count: number;
@@ -36,7 +41,13 @@ export interface SubscriptionDetails {
   plan_config: import('./plans.js').PlanConfig;
   usage: SubscriptionUsage;
   is_active: boolean;
-  stripe_configured: boolean;
+  is_owner_demo: boolean;
+  access_mode: import('./plans.js').AccessMode;
+  billing_provider: import('./plans.js').SubscriptionProvider;
+  owner_demo_available_plans?: import('./plans.js').PlanTier[];
+  paddle_configured: boolean;
+  paddle_env?: string;
+  paddle_client_token?: string;
 }
 
 export interface User {
@@ -50,6 +61,7 @@ export interface User {
   terms_accepted_at?: string;
   terms_version?: string;
   last_login_at?: string | null;
+  paddle_customer_id?: string | null;
   created_at: string;
 }
 
@@ -87,16 +99,26 @@ export interface Invoice {
   updated_at: string;
 }
 
+export type ReminderType = 'manual' | 'automatic';
+export type ReminderStatus = 'PENDING' | 'SENDING' | 'SENT' | 'FAILED' | 'CANCELLED' | 'CONFIG_REQUIRED';
+
 export interface Reminder {
   id: string;
+  user_id?: string;
   invoice_id: string;
   client_id: string;
   recipient_email: string;
+  reminder_type?: ReminderType;
+  scheduled_at?: string | null;
+  attempted_at?: string | null;
+  sent_at?: string | null;
+  status: ReminderStatus;
+  provider_message_id?: string | null;
+  attempt_count?: number;
+  error_message?: string | null;
   subject: string;
   message: string;
-  sent_at: string;
-  status: 'SENT' | 'FAILED' | 'CONFIG_REQUIRED';
-  error_message?: string;
+  created_at?: string;
 }
 
 export interface ActivityLog {
@@ -156,7 +178,7 @@ export interface AdminDashboardStats {
   system_health: {
     database: 'PASS' | 'FAIL';
     email: 'PASS' | 'NOT CONFIGURED' | 'FAIL';
-    stripe: 'PASS' | 'NOT CONFIGURED';
+    paddle: 'PASS' | 'NOT CONFIGURED';
     worker: 'PASS' | 'WARNING' | 'FAIL';
   };
 }
@@ -188,6 +210,8 @@ export interface AdminSubscriptionItem {
   provider: import('./plans.js').SubscriptionProvider;
   provider_customer_id: string | null;
   provider_subscription_id: string | null;
+  paddle_customer_id?: string | null;
+  paddle_subscription_id?: string | null;
   current_period_start: string;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
@@ -209,11 +233,12 @@ export interface AdminSystemHealth {
     from_email: string;
     details?: string;
   };
-  stripe: {
+  paddle: {
     status: 'PASS' | 'NOT CONFIGURED' | 'FAIL';
     configured: boolean;
     webhook_configured: boolean;
     price_ids_configured: boolean;
+    environment: string;
   };
   application: {
     status: 'PASS';

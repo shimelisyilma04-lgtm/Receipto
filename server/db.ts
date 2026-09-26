@@ -8,6 +8,8 @@ import type {
   Client,
   Invoice,
   Reminder,
+  ReminderStatus,
+  ReminderType,
   ActivityLog,
   DashboardStats,
   PaymentStatus,
@@ -18,15 +20,27 @@ import type {
   SubscriptionStatus,
   BillingInterval,
   SubscriptionProvider,
+  AccessMode,
 } from './types.js';
 import {
   PLAN_CONFIGS,
   getEffectivePlan,
   isPaidSubscriptionActive,
+  isOwnerEmail,
+  isOwnerAccount,
+  getDefaultOwnerPlan,
+  getPlanLimitReachedMessage,
+  PlanLimitExceededError,
   type PlanFeatures,
   type PlanConfig,
 } from './plans.js';
-import { isStripeConfigured } from './stripe.js';
+import {
+  isPaddleConfigured,
+  isPaddleWebhookConfigured,
+  getPaddleEnvironment,
+  getPaddlePriceId,
+  getPaddleClientToken,
+} from './paddle.js';
 
 const { Pool } = pg;
 
@@ -34,6 +48,30 @@ const { Pool } = pg;
 let pool: pg.Pool | null = null;
 let isPostgres = false;
 let dbInitialized = false;
+
+// Per-key asynchronous lock to serialize concurrent write operations (e.g. client/invoice creation)
+class AsyncKeyLock {
+  private queues = new Map<string, Promise<void>>();
+
+  async acquire<T>(key: string, fn: () => Promise<T> | T): Promise<T> {
+    while (this.queues.has(key)) {
+      await this.queues.get(key);
+    }
+    let release!: () => void;
+    const lockPromise = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.queues.set(key, lockPromise);
+    try {
+      return await fn();
+    } finally {
+      this.queues.delete(key);
+      release();
+    }
+  }
+}
+
+export const userMutex = new AsyncKeyLock();
 
 // Data directory for local fallback persistence
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -267,10 +305,22 @@ export async function initDatabase(): Promise<{ success: boolean; engine: 'postg
             recipient_email TEXT NOT NULL,
             subject TEXT NOT NULL,
             message TEXT NOT NULL,
-            sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            sent_at TIMESTAMPTZ,
             status TEXT NOT NULL DEFAULT 'SENT',
-            error_message TEXT
+            error_message TEXT,
+            reminder_type TEXT DEFAULT 'manual',
+            scheduled_at TIMESTAMPTZ,
+            attempted_at TIMESTAMPTZ,
+            provider_message_id TEXT,
+            attempt_count INT DEFAULT 1,
+            created_at TIMESTAMPTZ DEFAULT NOW()
           );
+          ALTER TABLE reminders ADD COLUMN IF NOT EXISTS reminder_type TEXT DEFAULT 'manual';
+          ALTER TABLE reminders ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
+          ALTER TABLE reminders ADD COLUMN IF NOT EXISTS attempted_at TIMESTAMPTZ;
+          ALTER TABLE reminders ADD COLUMN IF NOT EXISTS provider_message_id TEXT;
+          ALTER TABLE reminders ADD COLUMN IF NOT EXISTS attempt_count INT DEFAULT 1;
+          ALTER TABLE reminders ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
           CREATE INDEX IF NOT EXISTS idx_reminders_user_id ON reminders(user_id);
           CREATE INDEX IF NOT EXISTS idx_reminders_invoice_id ON reminders(invoice_id);
         `);
@@ -321,15 +371,22 @@ export async function initDatabase(): Promise<{ success: boolean; engine: 'postg
             provider TEXT NOT NULL DEFAULT 'manual',
             provider_customer_id TEXT,
             provider_subscription_id TEXT,
+            paddle_customer_id TEXT,
+            paddle_subscription_id TEXT,
             current_period_start TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             current_period_end TIMESTAMPTZ,
             cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
           );
+          ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS paddle_customer_id TEXT;
+          ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS paddle_subscription_id TEXT;
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS paddle_customer_id TEXT;
           CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);
           CREATE INDEX IF NOT EXISTS idx_subscriptions_customer ON subscriptions(provider_customer_id);
           CREATE INDEX IF NOT EXISTS idx_subscriptions_sub_id ON subscriptions(provider_subscription_id);
+          CREATE INDEX IF NOT EXISTS idx_subscriptions_paddle_cust ON subscriptions(paddle_customer_id);
+          CREATE INDEX IF NOT EXISTS idx_subscriptions_paddle_sub ON subscriptions(paddle_subscription_id);
         `);
 
         // Create Processed Webhook Events Table (for webhook idempotency)
@@ -631,7 +688,7 @@ export async function createEmailVerification(data: {
   otp_hash: string;
   salt: string;
   expires_at: string;
-  purpose?: 'email_verification';
+  purpose?: 'email_verification' | 'password_reset';
 }): Promise<EmailVerification> {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -861,33 +918,68 @@ export async function getClientById(userId: string, clientId: string): Promise<C
   return memoryStore.clients.find(c => c.user_id === userId && c.id === clientId) || null;
 }
 
-export async function createClient(userId: string, data: { name: string; email: string; phone?: string; company?: string; address?: string }): Promise<Client> {
-  const id = crypto.randomUUID();
-  const now = new Date().toISOString();
+export async function createClient(
+  userId: string,
+  data: { name: string; email: string; phone?: string; company?: string; address?: string }
+): Promise<Client> {
+  return await userMutex.acquire(userId, async () => {
+    const sub = await getSubscription(userId);
+    const planConfig = getEffectivePlan(sub.plan, sub.status, sub.current_period_end);
+    const maxClients = planConfig.limits.maxClients;
 
-  if (isPostgres && pool) {
-    const res = await pool.query(
-      `INSERT INTO clients (id, user_id, name, email, phone, company, address, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [id, userId, data.name.trim(), data.email.trim().toLowerCase(), data.phone?.trim() || null, data.company?.trim() || null, data.address?.trim() || null, now, now]
-    );
-    return res.rows[0];
-  }
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
 
-  const client: Client = {
-    id,
-    user_id: userId,
-    name: data.name.trim(),
-    email: data.email.trim().toLowerCase(),
-    phone: data.phone?.trim(),
-    company: data.company?.trim(),
-    address: data.address?.trim(),
-    created_at: now,
-    updated_at: now,
-  };
-  memoryStore.clients.push(client);
-  saveLocalStore();
-  return client;
+    if (isPostgres && pool) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [userId]);
+        const countRes = await client.query('SELECT COUNT(*)::int as count FROM clients WHERE user_id = $1', [userId]);
+        const currentCount = countRes.rows[0]?.count || 0;
+
+        if (maxClients !== null && currentCount >= maxClients) {
+          await client.query('ROLLBACK');
+          throw new PlanLimitExceededError('clients', currentCount, maxClients, planConfig.tier);
+        }
+
+        const res = await client.query(
+          `INSERT INTO clients (id, user_id, name, email, phone, company, address, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+          [id, userId, data.name.trim(), data.email.trim().toLowerCase(), data.phone?.trim() || null, data.company?.trim() || null, data.address?.trim() || null, now, now]
+        );
+        await client.query('COMMIT');
+        return res.rows[0];
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        client.release();
+      }
+    }
+
+    // Local JSON store fallback with synchronous read-check-write under userMutex
+    reloadLocalStore();
+    const currentCount = memoryStore.clients.filter(c => c.user_id === userId).length;
+    if (maxClients !== null && currentCount >= maxClients) {
+      throw new PlanLimitExceededError('clients', currentCount, maxClients, planConfig.tier);
+    }
+
+    const client: Client = {
+      id,
+      user_id: userId,
+      name: data.name.trim(),
+      email: data.email.trim().toLowerCase(),
+      phone: data.phone?.trim(),
+      company: data.company?.trim(),
+      address: data.address?.trim(),
+      created_at: now,
+      updated_at: now,
+    };
+    memoryStore.clients.push(client);
+    saveLocalStore();
+    return client;
+  });
 }
 
 export async function updateClient(userId: string, clientId: string, data: { name?: string; email?: string; phone?: string; company?: string; address?: string }): Promise<Client | null> {
@@ -1085,46 +1177,96 @@ export async function createInvoice(
     notes?: string;
   }
 ): Promise<Invoice> {
-  const id = crypto.randomUUID();
-  const now = new Date().toISOString();
-  const currency = data.currency || 'USD';
-  const today = now.split('T')[0];
-  const initialStatus: PaymentStatus = data.due_date < today ? 'OVERDUE' : 'UNPAID';
+  return await userMutex.acquire(userId, async () => {
+    const sub = await getSubscription(userId);
+    const planConfig = getEffectivePlan(sub.plan, sub.status, sub.current_period_end);
+    const maxInvoices = planConfig.limits.maxInvoicesPerMonth;
 
-  if (isPostgres && pool) {
-    const res = await pool.query(
-      `INSERT INTO invoices (id, user_id, client_id, invoice_number, amount, currency, issue_date, due_date, payment_status, notes, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
-      [id, userId, data.client_id, data.invoice_number.trim(), data.amount, currency, data.issue_date, data.due_date, initialStatus, data.notes?.trim() || null, now, now]
-    );
-    const r = res.rows[0];
-    return {
-      ...r,
-      amount: parseFloat(r.amount),
-      issue_date: typeof r.issue_date === 'string' ? r.issue_date.split('T')[0] : r.issue_date.toISOString().split('T')[0],
-      due_date: typeof r.due_date === 'string' ? r.due_date.split('T')[0] : r.due_date.toISOString().split('T')[0],
-      payment_status: computeInvoiceStatus(r, today),
+    let periodStart: string;
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    if (sub.current_period_start && isPaidSubscriptionActive(sub.status, sub.current_period_end)) {
+      periodStart = sub.current_period_start;
+    } else {
+      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      periodStart = monthStart.toISOString();
+    }
+
+    const id = crypto.randomUUID();
+    const currency = data.currency || 'USD';
+    const today = nowIso.split('T')[0];
+    const initialStatus: PaymentStatus = data.due_date < today ? 'OVERDUE' : 'UNPAID';
+
+    if (isPostgres && pool) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [userId]);
+
+        const countRes = await client.query(
+          'SELECT COUNT(*)::int as count FROM invoices WHERE user_id = $1 AND created_at >= $2',
+          [userId, periodStart]
+        );
+        const currentCount = countRes.rows[0]?.count || 0;
+
+        if (maxInvoices !== null && currentCount >= maxInvoices) {
+          await client.query('ROLLBACK');
+          throw new PlanLimitExceededError('invoices', currentCount, maxInvoices, planConfig.tier);
+        }
+
+        const res = await client.query(
+          `INSERT INTO invoices (id, user_id, client_id, invoice_number, amount, currency, issue_date, due_date, payment_status, notes, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+          [id, userId, data.client_id, data.invoice_number.trim(), data.amount, currency, data.issue_date, data.due_date, initialStatus, data.notes?.trim() || null, nowIso, nowIso]
+        );
+        await client.query('COMMIT');
+        const r = res.rows[0];
+        return {
+          ...r,
+          amount: parseFloat(r.amount),
+          issue_date: typeof r.issue_date === 'string' ? r.issue_date.split('T')[0] : r.issue_date.toISOString().split('T')[0],
+          due_date: typeof r.due_date === 'string' ? r.due_date.split('T')[0] : r.due_date.toISOString().split('T')[0],
+          payment_status: computeInvoiceStatus(r, today),
+        };
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        client.release();
+      }
+    }
+
+    // Local JSON store fallback with synchronous read-check-write under userMutex
+    reloadLocalStore();
+    const startTime = new Date(periodStart).getTime();
+    const currentCount = memoryStore.invoices.filter(
+      i => i.user_id === userId && new Date(i.created_at).getTime() >= startTime
+    ).length;
+
+    if (maxInvoices !== null && currentCount >= maxInvoices) {
+      throw new PlanLimitExceededError('invoices', currentCount, maxInvoices, planConfig.tier);
+    }
+
+    const invoice: Invoice = {
+      id,
+      user_id: userId,
+      client_id: data.client_id,
+      invoice_number: data.invoice_number.trim(),
+      amount: data.amount,
+      currency,
+      issue_date: data.issue_date,
+      due_date: data.due_date,
+      payment_status: initialStatus,
+      paid_date: null,
+      notes: data.notes?.trim(),
+      created_at: nowIso,
+      updated_at: nowIso,
     };
-  }
-
-  const invoice: Invoice = {
-    id,
-    user_id: userId,
-    client_id: data.client_id,
-    invoice_number: data.invoice_number.trim(),
-    amount: data.amount,
-    currency,
-    issue_date: data.issue_date,
-    due_date: data.due_date,
-    payment_status: initialStatus,
-    paid_date: null,
-    notes: data.notes?.trim(),
-    created_at: now,
-    updated_at: now,
-  };
-  memoryStore.invoices.push(invoice);
-  saveLocalStore();
-  return invoice;
+    memoryStore.invoices.push(invoice);
+    saveLocalStore();
+    return invoice;
+  });
 }
 
 export async function updateInvoice(
@@ -1302,18 +1444,48 @@ export async function createReminder(
     recipient_email: string;
     subject: string;
     message: string;
-    status: 'SENT' | 'FAILED' | 'CONFIG_REQUIRED';
+    status: ReminderStatus;
     error_message?: string;
+    reminder_type?: ReminderType;
+    scheduled_at?: string | null;
+    attempted_at?: string | null;
+    sent_at?: string | null;
+    provider_message_id?: string | null;
+    attempt_count?: number;
   }
 ): Promise<Reminder> {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
+  const sentAt = data.status === 'SENT' ? (data.sent_at || now) : (data.sent_at || null);
+  const reminderType = data.reminder_type || 'manual';
+  const attemptedAt = data.attempted_at || now;
+  const attemptCount = data.attempt_count ?? 1;
 
   if (isPostgres && pool) {
     const res = await pool.query(
-      `INSERT INTO reminders (id, user_id, invoice_id, client_id, recipient_email, subject, message, sent_at, status, error_message)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-      [id, userId, data.invoice_id, data.client_id, data.recipient_email, data.subject, data.message, now, data.status, data.error_message || null]
+      `INSERT INTO reminders (
+        id, user_id, invoice_id, client_id, recipient_email, subject, message,
+        sent_at, status, error_message, reminder_type, scheduled_at, attempted_at,
+        provider_message_id, attempt_count
+      )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
+      [
+        id,
+        userId,
+        data.invoice_id,
+        data.client_id,
+        data.recipient_email,
+        data.subject,
+        data.message,
+        sentAt,
+        data.status,
+        data.error_message || null,
+        reminderType,
+        data.scheduled_at || null,
+        attemptedAt,
+        data.provider_message_id || null,
+        attemptCount,
+      ]
     );
     return res.rows[0];
   }
@@ -1326,9 +1498,15 @@ export async function createReminder(
     recipient_email: data.recipient_email,
     subject: data.subject,
     message: data.message,
-    sent_at: now,
+    sent_at: sentAt,
     status: data.status,
     error_message: data.error_message,
+    reminder_type: reminderType,
+    scheduled_at: data.scheduled_at || null,
+    attempted_at: attemptedAt,
+    provider_message_id: data.provider_message_id || null,
+    attempt_count: attemptCount,
+    created_at: now,
   };
   memoryStore.reminders.push(reminder);
   saveLocalStore();
@@ -1352,7 +1530,7 @@ export async function getReminders(userId: string, invoiceId?: string): Promise<
   if (invoiceId) {
     list = list.filter(r => r.invoice_id === invoiceId);
   }
-  return list.sort((a, b) => b.sent_at.localeCompare(a.sent_at));
+  return list.sort((a, b) => (b.sent_at || b.created_at || '').localeCompare(a.sent_at || a.created_at || ''));
 }
 
 // Activity logs
@@ -1467,74 +1645,144 @@ export async function getDashboardStats(userId: string): Promise<DashboardStats>
 
 export async function getSubscription(userId: string): Promise<Subscription> {
   const now = new Date().toISOString();
+  const user = await getUserById(userId);
+  const isOwner = isOwnerAccount(user);
+
+  let sub: Subscription;
 
   if (isPostgres && pool) {
     const res = await pool.query('SELECT * FROM subscriptions WHERE user_id = $1 LIMIT 1', [userId]);
     if (res.rows.length > 0) {
       const r = res.rows[0];
-      return {
+      sub = {
         ...r,
+        paddle_customer_id: r.paddle_customer_id || r.provider_customer_id || null,
+        paddle_subscription_id: r.paddle_subscription_id || r.provider_subscription_id || null,
         current_period_start: typeof r.current_period_start === 'string' ? r.current_period_start : r.current_period_start.toISOString(),
         current_period_end: r.current_period_end ? (typeof r.current_period_end === 'string' ? r.current_period_end : r.current_period_end.toISOString()) : null,
         created_at: typeof r.created_at === 'string' ? r.created_at : r.created_at.toISOString(),
         updated_at: typeof r.updated_at === 'string' ? r.updated_at : r.updated_at.toISOString(),
       };
+    } else {
+      // Auto-create initial subscription for user
+      const defaultPlan = isOwner ? getDefaultOwnerPlan() : 'FREE';
+      const defaultProvider: SubscriptionProvider = isOwner ? 'demo' : 'manual';
+      const defaultAccessMode: AccessMode = isOwner ? 'owner_demo' : 'free';
+      const id = crypto.randomUUID();
+      const insertRes = await pool.query(
+        `INSERT INTO subscriptions (
+          id, user_id, plan, status, billing_interval, provider,
+          provider_customer_id, provider_subscription_id,
+          paddle_customer_id, paddle_subscription_id,
+          current_period_start, current_period_end, cancel_at_period_end,
+          created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        RETURNING *`,
+        [id, userId, defaultPlan, 'active', 'monthly', defaultProvider, null, null, null, null, now, null, false, now, now]
+      );
+      const r = insertRes.rows[0];
+      sub = {
+        ...r,
+        access_mode: defaultAccessMode,
+        paddle_customer_id: null,
+        paddle_subscription_id: null,
+        current_period_start: typeof r.current_period_start === 'string' ? r.current_period_start : r.current_period_start.toISOString(),
+        current_period_end: null,
+        created_at: typeof r.created_at === 'string' ? r.created_at : r.created_at.toISOString(),
+        updated_at: typeof r.updated_at === 'string' ? r.updated_at : r.updated_at.toISOString(),
+      };
     }
-
-    // Auto-create default FREE subscription for user
-    const id = crypto.randomUUID();
-    const insertRes = await pool.query(
-      `INSERT INTO subscriptions (
-        id, user_id, plan, status, billing_interval, provider,
-        provider_customer_id, provider_subscription_id,
-        current_period_start, current_period_end, cancel_at_period_end,
-        created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      RETURNING *`,
-      [id, userId, 'FREE', 'active', 'monthly', 'manual', null, null, now, null, false, now, now]
-    );
-    const r = insertRes.rows[0];
-    return {
-      ...r,
-      current_period_start: typeof r.current_period_start === 'string' ? r.current_period_start : r.current_period_start.toISOString(),
-      current_period_end: null,
-      created_at: typeof r.created_at === 'string' ? r.created_at : r.created_at.toISOString(),
-      updated_at: typeof r.updated_at === 'string' ? r.updated_at : r.updated_at.toISOString(),
-    };
+  } else {
+    // Local persistent fallback
+    reloadLocalStore();
+    let localSub = memoryStore.subscriptions.find(s => s.user_id === userId);
+    if (!localSub) {
+      const defaultPlan = isOwner ? getDefaultOwnerPlan() : 'FREE';
+      const defaultProvider: SubscriptionProvider = isOwner ? 'demo' : 'manual';
+      const defaultAccessMode: AccessMode = isOwner ? 'owner_demo' : 'free';
+      localSub = {
+        id: crypto.randomUUID(),
+        user_id: userId,
+        plan: defaultPlan,
+        status: 'active',
+        billing_interval: 'monthly',
+        provider: defaultProvider,
+        access_mode: defaultAccessMode,
+        provider_customer_id: null,
+        provider_subscription_id: null,
+        paddle_customer_id: null,
+        paddle_subscription_id: null,
+        current_period_start: now,
+        current_period_end: null,
+        cancel_at_period_end: false,
+        created_at: now,
+        updated_at: now,
+      };
+      memoryStore.subscriptions.push(localSub);
+      saveLocalStore();
+    }
+    sub = localSub;
   }
 
-  // Local persistent fallback
-  reloadLocalStore();
-  let sub = memoryStore.subscriptions.find(s => s.user_id === userId);
-  if (!sub) {
-    sub = {
-      id: crypto.randomUUID(),
-      user_id: userId,
-      plan: 'FREE',
-      status: 'active',
-      billing_interval: 'monthly',
-      provider: 'manual',
-      provider_customer_id: null,
-      provider_subscription_id: null,
-      current_period_start: now,
-      current_period_end: null,
-      cancel_at_period_end: false,
-      created_at: now,
-      updated_at: now,
-    };
-    memoryStore.subscriptions.push(sub);
-    saveLocalStore();
+  // Authoritative sanitization: strictly enforce owner_demo vs paddle vs free
+  if (isOwner) {
+    if (sub.provider === 'paddle' && sub.provider_subscription_id) {
+      sub.access_mode = 'paddle';
+    } else {
+      sub.provider = 'demo';
+      sub.access_mode = 'owner_demo';
+    }
+  } else {
+    // Non-owner account can NEVER have owner_demo access mode or demo provider
+    if (sub.provider === 'demo' || sub.access_mode === 'owner_demo') {
+      sub.provider = 'manual';
+      sub.access_mode = 'free';
+      sub.plan = 'FREE';
+    } else if (sub.provider === 'paddle' && sub.provider_subscription_id) {
+      sub.access_mode = 'paddle';
+    } else {
+      sub.access_mode = 'free';
+    }
   }
+
   return sub;
+}
+
+export async function updateOwnerDemoPlan(userId: string, plan: PlanTier): Promise<Subscription> {
+  const user = await getUserById(userId);
+  if (!isOwnerAccount(user)) {
+    throw new Error('Only the verified owner account can use demo plan controls.');
+  }
+
+  const now = new Date().toISOString();
+  return await upsertSubscription({
+    user_id: userId,
+    plan,
+    status: 'active',
+    billing_interval: 'monthly',
+    provider: 'demo',
+    access_mode: 'owner_demo',
+    cancel_at_period_end: false,
+    current_period_start: now,
+    current_period_end: null,
+  });
 }
 
 export async function upsertSubscription(data: Partial<Subscription> & { user_id: string }): Promise<Subscription> {
   const current = await getSubscription(data.user_id);
   const now = new Date().toISOString();
 
+  const paddleCustomerId = data.paddle_customer_id || data.provider_customer_id || current.paddle_customer_id || current.provider_customer_id || null;
+  const paddleSubscriptionId = data.paddle_subscription_id || data.provider_subscription_id || current.paddle_subscription_id || current.provider_subscription_id || null;
+
   const updated: Subscription = {
     ...current,
     ...data,
+    provider: data.provider || 'paddle',
+    provider_customer_id: paddleCustomerId,
+    provider_subscription_id: paddleSubscriptionId,
+    paddle_customer_id: paddleCustomerId,
+    paddle_subscription_id: paddleSubscriptionId,
     updated_at: now,
   };
 
@@ -1543,9 +1791,10 @@ export async function upsertSubscription(data: Partial<Subscription> & { user_id
       `INSERT INTO subscriptions (
         id, user_id, plan, status, billing_interval, provider,
         provider_customer_id, provider_subscription_id,
+        paddle_customer_id, paddle_subscription_id,
         current_period_start, current_period_end, cancel_at_period_end,
         created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       ON CONFLICT (user_id) DO UPDATE SET
         plan = EXCLUDED.plan,
         status = EXCLUDED.status,
@@ -1553,6 +1802,8 @@ export async function upsertSubscription(data: Partial<Subscription> & { user_id
         provider = EXCLUDED.provider,
         provider_customer_id = EXCLUDED.provider_customer_id,
         provider_subscription_id = EXCLUDED.provider_subscription_id,
+        paddle_customer_id = EXCLUDED.paddle_customer_id,
+        paddle_subscription_id = EXCLUDED.paddle_subscription_id,
         current_period_start = EXCLUDED.current_period_start,
         current_period_end = EXCLUDED.current_period_end,
         cancel_at_period_end = EXCLUDED.cancel_at_period_end,
@@ -1567,6 +1818,8 @@ export async function upsertSubscription(data: Partial<Subscription> & { user_id
         updated.provider,
         updated.provider_customer_id,
         updated.provider_subscription_id,
+        updated.paddle_customer_id,
+        updated.paddle_subscription_id,
         updated.current_period_start,
         updated.current_period_end,
         updated.cancel_at_period_end,
@@ -1574,9 +1827,16 @@ export async function upsertSubscription(data: Partial<Subscription> & { user_id
         updated.updated_at,
       ]
     );
+
+    if (paddleCustomerId) {
+      await pool.query('UPDATE users SET paddle_customer_id = $1 WHERE id = $2', [paddleCustomerId, data.user_id]);
+    }
+
     const r = res.rows[0];
     return {
       ...r,
+      paddle_customer_id: r.paddle_customer_id || r.provider_customer_id || null,
+      paddle_subscription_id: r.paddle_subscription_id || r.provider_subscription_id || null,
       current_period_start: typeof r.current_period_start === 'string' ? r.current_period_start : r.current_period_start.toISOString(),
       current_period_end: r.current_period_end ? (typeof r.current_period_end === 'string' ? r.current_period_end : r.current_period_end.toISOString()) : null,
       created_at: typeof r.created_at === 'string' ? r.created_at : r.created_at.toISOString(),
@@ -1590,17 +1850,30 @@ export async function upsertSubscription(data: Partial<Subscription> & { user_id
   } else {
     memoryStore.subscriptions.push(updated);
   }
+
+  if (paddleCustomerId) {
+    const user = memoryStore.users.find(u => u.id === data.user_id);
+    if (user) {
+      user.paddle_customer_id = paddleCustomerId;
+    }
+  }
+
   saveLocalStore();
   return updated;
 }
 
 export async function getSubscriptionByProviderSubId(subId: string): Promise<Subscription | null> {
   if (isPostgres && pool) {
-    const res = await pool.query('SELECT * FROM subscriptions WHERE provider_subscription_id = $1 LIMIT 1', [subId]);
+    const res = await pool.query(
+      'SELECT * FROM subscriptions WHERE provider_subscription_id = $1 OR paddle_subscription_id = $1 LIMIT 1',
+      [subId]
+    );
     if (res.rows.length === 0) return null;
     const r = res.rows[0];
     return {
       ...r,
+      paddle_customer_id: r.paddle_customer_id || r.provider_customer_id || null,
+      paddle_subscription_id: r.paddle_subscription_id || r.provider_subscription_id || null,
       current_period_start: typeof r.current_period_start === 'string' ? r.current_period_start : r.current_period_start.toISOString(),
       current_period_end: r.current_period_end ? (typeof r.current_period_end === 'string' ? r.current_period_end : r.current_period_end.toISOString()) : null,
       created_at: typeof r.created_at === 'string' ? r.created_at : r.created_at.toISOString(),
@@ -1609,16 +1882,23 @@ export async function getSubscriptionByProviderSubId(subId: string): Promise<Sub
   }
 
   reloadLocalStore();
-  return memoryStore.subscriptions.find(s => s.provider_subscription_id === subId) || null;
+  return memoryStore.subscriptions.find(
+    s => s.provider_subscription_id === subId || s.paddle_subscription_id === subId
+  ) || null;
 }
 
 export async function getSubscriptionByCustomerId(customerId: string): Promise<Subscription | null> {
   if (isPostgres && pool) {
-    const res = await pool.query('SELECT * FROM subscriptions WHERE provider_customer_id = $1 LIMIT 1', [customerId]);
+    const res = await pool.query(
+      'SELECT * FROM subscriptions WHERE provider_customer_id = $1 OR paddle_customer_id = $1 LIMIT 1',
+      [customerId]
+    );
     if (res.rows.length === 0) return null;
     const r = res.rows[0];
     return {
       ...r,
+      paddle_customer_id: r.paddle_customer_id || r.provider_customer_id || null,
+      paddle_subscription_id: r.paddle_subscription_id || r.provider_subscription_id || null,
       current_period_start: typeof r.current_period_start === 'string' ? r.current_period_start : r.current_period_start.toISOString(),
       current_period_end: r.current_period_end ? (typeof r.current_period_end === 'string' ? r.current_period_end : r.current_period_end.toISOString()) : null,
       created_at: typeof r.created_at === 'string' ? r.created_at : r.created_at.toISOString(),
@@ -1627,7 +1907,35 @@ export async function getSubscriptionByCustomerId(customerId: string): Promise<S
   }
 
   reloadLocalStore();
-  return memoryStore.subscriptions.find(s => s.provider_customer_id === customerId) || null;
+  return memoryStore.subscriptions.find(
+    s => s.provider_customer_id === customerId || s.paddle_customer_id === customerId
+  ) || null;
+}
+
+export async function getUserByPaddleCustomerId(customerId: string): Promise<User | null> {
+  if (isPostgres && pool) {
+    const userRes = await pool.query('SELECT * FROM users WHERE paddle_customer_id = $1 LIMIT 1', [customerId]);
+    if (userRes.rows.length > 0) return userRes.rows[0];
+    const subRes = await pool.query(
+      'SELECT user_id FROM subscriptions WHERE provider_customer_id = $1 OR paddle_customer_id = $1 LIMIT 1',
+      [customerId]
+    );
+    if (subRes.rows.length > 0) {
+      return await getUserById(subRes.rows[0].user_id);
+    }
+    return null;
+  }
+
+  reloadLocalStore();
+  const directUser = memoryStore.users.find(u => u.paddle_customer_id === customerId);
+  if (directUser) return directUser;
+  const sub = memoryStore.subscriptions.find(
+    s => s.provider_customer_id === customerId || s.paddle_customer_id === customerId
+  );
+  if (sub) {
+    return memoryStore.users.find(u => u.id === sub.user_id) || null;
+  }
+  return null;
 }
 
 export async function isWebhookEventProcessed(eventId: string): Promise<boolean> {
@@ -1703,15 +2011,17 @@ export async function getUserUsage(userId: string): Promise<SubscriptionUsage> {
     ).length;
 
     automatedRemindersCount = memoryStore.reminders.filter(
-      r => r.user_id === userId && new Date(r.sent_at).getTime() >= startTime && r.status === 'SENT'
+      r => r.user_id === userId && r.sent_at && new Date(r.sent_at).getTime() >= startTime && r.status === 'SENT'
     ).length;
   }
 
   return {
     client_count: clientCount,
     max_clients: planConfig.limits.maxClients,
+    clients_remaining: planConfig.limits.maxClients !== null ? Math.max(0, planConfig.limits.maxClients - clientCount) : null,
     invoices_this_period: invoicesThisPeriod,
     max_invoices_per_month: planConfig.limits.maxInvoicesPerMonth,
+    invoices_remaining: planConfig.limits.maxInvoicesPerMonth !== null ? Math.max(0, planConfig.limits.maxInvoicesPerMonth - invoicesThisPeriod) : null,
     period_start: periodStart,
     period_end: sub.current_period_end || null,
     automated_reminders_count: automatedRemindersCount,
@@ -1728,7 +2038,7 @@ export async function checkCanCreateClient(
   if (planConfig.limits.maxClients !== null && usage.client_count >= planConfig.limits.maxClients) {
     return {
       allowed: false,
-      reason: `Client limit reached (${usage.client_count} of ${planConfig.limits.maxClients}) for the ${planConfig.name} plan. Upgrade to add more clients.`,
+      reason: getPlanLimitReachedMessage('clients', planConfig.tier, planConfig.limits.maxClients),
       current: usage.client_count,
       max: planConfig.limits.maxClients,
       plan: planConfig.tier,
@@ -1756,7 +2066,7 @@ export async function checkCanCreateInvoice(
   ) {
     return {
       allowed: false,
-      reason: `Monthly invoice limit reached (${usage.invoices_this_period} of ${planConfig.limits.maxInvoicesPerMonth}) for the ${planConfig.name} plan. Upgrade to issue unlimited invoices.`,
+      reason: getPlanLimitReachedMessage('invoices', planConfig.tier, planConfig.limits.maxInvoicesPerMonth),
       current: usage.invoices_this_period,
       max: planConfig.limits.maxInvoicesPerMonth,
       plan: planConfig.tier,
@@ -1789,17 +2099,33 @@ export async function checkFeatureAccess(
 }
 
 export async function getSubscriptionDetails(userId: string) {
+  const user = await getUserById(userId);
   const sub = await getSubscription(userId);
   const planConfig = getEffectivePlan(sub.plan, sub.status, sub.current_period_end);
   const usage = await getUserUsage(userId);
   const isActive = isPaidSubscriptionActive(sub.status, sub.current_period_end);
 
+  const isOwner = isOwnerAccount(user);
+  const isOwnerDemo = isOwner && (sub.access_mode === 'owner_demo' || sub.provider === 'demo');
+  const accessMode: AccessMode = isOwnerDemo ? 'owner_demo' : (sub.provider === 'paddle' ? 'paddle' : 'free');
+  const billingProvider: SubscriptionProvider = isOwnerDemo ? 'demo' : (sub.provider === 'paddle' ? 'paddle' : 'manual');
+
   return {
-    subscription: sub,
+    subscription: {
+      ...sub,
+      access_mode: accessMode,
+      provider: billingProvider,
+    },
     plan_config: planConfig,
     usage,
     is_active: isActive,
-    stripe_configured: Boolean(process.env.STRIPE_SECRET_KEY),
+    is_owner_demo: isOwnerDemo,
+    access_mode: accessMode,
+    billing_provider: billingProvider,
+    owner_demo_available_plans: isOwner ? (['FREE', 'STARTER', 'GROWTH'] as PlanTier[]) : undefined,
+    paddle_configured: isPaddleConfigured(),
+    paddle_env: getPaddleEnvironment(),
+    paddle_client_token: getPaddleClientToken(),
   };
 }
 
@@ -1850,7 +2176,7 @@ export async function getRecentRemindersForInvoice(invoiceId: string, days: numb
 
 export async function getAdminDashboardStats(): Promise<import('./types.js').AdminDashboardStats> {
   const isEmailConfigured = Boolean(process.env.RESEND_API_KEY);
-  const isStripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
+  const isPaddleActive = isPaddleConfigured();
 
   let totalUsers = 0;
   let verifiedUsers = 0;
@@ -1948,7 +2274,7 @@ export async function getAdminDashboardStats(): Promise<import('./types.js').Adm
     system_health: {
       database: 'PASS',
       email: isEmailConfigured ? 'PASS' : 'NOT CONFIGURED',
-      stripe: isStripeConfigured ? 'PASS' : 'NOT CONFIGURED',
+      paddle: isPaddleActive ? 'PASS' : 'NOT CONFIGURED',
       worker: 'PASS',
     },
   };
@@ -2246,8 +2572,8 @@ export async function getAdminActivityLogs(params: {
 
 export async function getAdminSystemHealth(workerStatus: any): Promise<import('./types.js').AdminSystemHealth> {
   const isEmailConfigured = Boolean(process.env.RESEND_API_KEY);
-  const isStripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
-  const isWebhookConfigured = Boolean(process.env.STRIPE_WEBHOOK_SECRET);
+  const isPaddleReady = isPaddleConfigured();
+  const isPaddleWebhookReady = isPaddleWebhookConfigured();
 
   let dbStatus: 'PASS' | 'FAIL' = 'PASS';
   let dbEngine: 'postgres' | 'local_persistent' = isPostgres ? 'postgres' : 'local_persistent';
@@ -2283,16 +2609,15 @@ export async function getAdminSystemHealth(workerStatus: any): Promise<import('.
       from_email: process.env.RESEND_FROM_EMAIL || 'Receipto <billing@resend.dev>',
       details: isEmailConfigured ? 'Resend API key configured' : 'RESEND_API_KEY environment variable not set',
     },
-    stripe: {
-      status: isStripeConfigured ? 'PASS' : 'NOT CONFIGURED',
-      configured: isStripeConfigured,
-      webhook_configured: isWebhookConfigured,
+    paddle: {
+      status: isPaddleReady ? 'PASS' : 'NOT CONFIGURED',
+      configured: isPaddleReady,
+      webhook_configured: isPaddleWebhookReady,
       price_ids_configured: Boolean(
-        process.env.STRIPE_STARTER_MONTHLY_PRICE_ID ||
-        process.env.STRIPE_STARTER_ANNUAL_PRICE_ID ||
-        process.env.STRIPE_GROWTH_MONTHLY_PRICE_ID ||
-        process.env.STRIPE_GROWTH_ANNUAL_PRICE_ID
+        getPaddlePriceId('STARTER', 'monthly') &&
+        getPaddlePriceId('GROWTH', 'monthly')
       ),
+      environment: getPaddleEnvironment(),
     },
     application: {
       status: 'PASS',

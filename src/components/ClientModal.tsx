@@ -10,8 +10,6 @@ interface ClientModalProps {
 }
 
 export function ClientModal({ isOpen, onClose, onSubmit, initialClient }: ClientModalProps) {
-  if (!isOpen) return null;
-
   const [name, setName] = useState(initialClient?.name || '');
   const [email, setEmail] = useState(initialClient?.email || '');
   const [phone, setPhone] = useState(initialClient?.phone || '');
@@ -35,6 +33,8 @@ export function ClientModal({ isOpen, onClose, onSubmit, initialClient }: Client
       setAddress('');
     }
   }, [initialClient]);
+
+  if (!isOpen) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

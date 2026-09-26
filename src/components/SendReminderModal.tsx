@@ -11,10 +11,8 @@ interface SendReminderModalProps {
 }
 
 export function SendReminderModal({ invoice, onClose, onSuccess, onError }: SendReminderModalProps) {
-  if (!invoice) return null;
-
   const [tone, setTone] = useState<'friendly' | 'standard' | 'urgent'>(
-    invoice.payment_status === 'OVERDUE' ? 'urgent' : 'friendly'
+    invoice?.payment_status === 'OVERDUE' ? 'urgent' : 'friendly'
   );
   const [customMessage, setCustomMessage] = useState('');
   const [loadingPreview, setLoadingPreview] = useState(true);
@@ -24,13 +22,15 @@ export function SendReminderModal({ invoice, onClose, onSuccess, onError }: Send
   const [isEmailConfigured, setIsEmailConfigured] = useState(false);
 
   useEffect(() => {
+    if (!invoice) return;
     loadPreview();
-  }, [tone, customMessage]);
+  }, [invoice?.id, tone, customMessage]);
 
   async function loadPreview() {
+    if (!invoice) return;
     try {
       setLoadingPreview(true);
-      const res = await api.previewReminder(invoice!.id, tone, customMessage);
+      const res = await api.previewReminder(invoice.id, tone, customMessage);
       setPreview(res.preview);
       setIsEmailConfigured(res.isEmailConfigured);
     } catch (err: any) {
@@ -41,13 +41,18 @@ export function SendReminderModal({ invoice, onClose, onSuccess, onError }: Send
   }
 
   async function handleSend() {
+    if (!invoice) return;
     try {
       setSending(true);
-      const res = await api.sendReminder(invoice!.id, tone, customMessage);
-      onSuccess(res.message);
-      onClose();
+      const res = await api.sendReminder(invoice.id, tone, customMessage);
+      if (res && res.success) {
+        onSuccess(res.message || 'Reminder email sent.');
+        onClose();
+      } else {
+        onError(res?.message || 'Email could not be sent. Please check your email configuration.');
+      }
     } catch (err: any) {
-      onError(err.message || 'Failed to dispatch reminder');
+      onError(err.message || 'Email could not be sent. Please check your email configuration.');
     } finally {
       setSending(false);
     }
@@ -60,6 +65,8 @@ export function SendReminderModal({ invoice, onClose, onSuccess, onError }: Send
       setTimeout(() => setCopied(false), 2000);
     }
   }
+
+  if (!invoice) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">

@@ -142,11 +142,13 @@ export async function sendReminderEmail(options: SendReminderOptions): Promise<E
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || 'Receipto <billing@resend.dev>';
 
-  if (!apiKey) {
+  // Validate API key: must exist, start with re_, and not be a placeholder
+  if (!apiKey || !apiKey.startsWith('re_') || apiKey.length < 20 || apiKey.includes('placeholder')) {
     return {
       success: false,
       configured: false,
-      statusText: 'Email service is not configured (RESEND_API_KEY is unset). Reminder draft generated for manual review.',
+      statusText: 'Email could not be sent. Please check your email configuration.',
+      error: 'RESEND_API_KEY is not configured or invalid format.',
     };
   }
 
@@ -176,7 +178,7 @@ export async function sendReminderEmail(options: SendReminderOptions): Promise<E
       return {
         success: false,
         configured: true,
-        statusText: `Resend dispatch failed: ${errorMsg}`,
+        statusText: 'Email could not be sent. Please check your email configuration.',
         error: errorMsg,
       };
     }
@@ -185,14 +187,14 @@ export async function sendReminderEmail(options: SendReminderOptions): Promise<E
       success: true,
       configured: true,
       messageId: data.id,
-      statusText: `Email delivered successfully (ID: ${data.id})`,
+      statusText: 'Reminder email sent.',
     };
   } catch (err: any) {
     console.error('[Email Dispatch Error]', err.message);
     return {
       success: false,
       configured: true,
-      statusText: `Network error reaching Resend: ${err.message}`,
+      statusText: 'Email could not be sent. Please check your email configuration.',
       error: err.message,
     };
   }
@@ -568,5 +570,168 @@ export async function sendSubscriptionCancelledEmail(options: { to: string; name
     return { success: false, configured: true, statusText: err.message };
   }
 }
+
+// ----------------------------------------------------
+// Welcome Email (Dispatched upon email verification)
+// ----------------------------------------------------
+export interface WelcomeEmailOptions {
+  to: string;
+  name: string;
+  businessName?: string;
+}
+
+export async function sendWelcomeEmail(options: WelcomeEmailOptions): Promise<EmailResult> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || 'Receipto <onboarding@resend.dev>';
+
+  if (!apiKey) {
+    return { success: false, configured: false, statusText: 'Email service is not configured.' };
+  }
+
+  const safeName = escapeHtml(options.name || 'there');
+  const safeBusiness = options.businessName ? escapeHtml(options.businessName) : 'your business';
+  const subject = `Welcome to Receipto — Invoice Tracking & Polite Payment Follow-ups`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #0f172a; background-color: #f8fafc; margin: 0; padding: 24px; }
+          .container { max-width: 540px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+          .header { background: #0f172a; color: #ffffff; padding: 28px 32px; }
+          .header h1 { margin: 0; font-size: 22px; font-weight: 700; color: #ffffff; }
+          .content { padding: 32px; }
+          .feature-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0; }
+          .footer { padding: 20px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Welcome to Receipto</h1>
+            <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 13px;">Accounts-Receivable Automation</p>
+          </div>
+          <div class="content">
+            <p>Hello ${safeName},</p>
+            <p>Your Receipto account is now verified and ready for ${safeBusiness}. Receipto helps you eliminate unpaid invoices with clear tracking and polite, automated reminder notices.</p>
+            <div class="feature-box">
+              <strong style="color: #0f172a;">Quick Start Checklist:</strong>
+              <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px; color: #475569;">
+                <li>Add your first client under <strong>Clients</strong></li>
+                <li>Generate and issue an invoice with customized payment terms</li>
+                <li>Send automated or polite manual reminder notices before and after due dates</li>
+              </ul>
+            </div>
+            <p style="font-size: 14px; color: #64748b;">If you need assistance setting up custom reminder cadences or Paddle billing, our team is here to help.</p>
+          </div>
+          <div class="footer">&copy; ${new Date().getFullYear()} Receipto. All rights reserved.</div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `Welcome to Receipto!\n\nHello ${options.name || 'there'},\nYour Receipto account is verified and ready. Start adding clients and tracking invoices today.\n\n--\nReceipto Team`;
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: fromEmail, to: [options.to], subject, html, text }),
+    });
+    const data = await response.json() as any;
+    if (!response.ok) return { success: false, configured: true, statusText: data?.message || 'Failed' };
+    return { success: true, configured: true, messageId: data.id, statusText: 'Welcome email dispatched.' };
+  } catch (err: any) {
+    return { success: false, configured: true, statusText: err.message };
+  }
+}
+
+// ----------------------------------------------------
+// Password Reset OTP Email
+// ----------------------------------------------------
+export interface PasswordResetEmailOptions {
+  to: string;
+  name: string;
+  otp: string;
+}
+
+export async function sendPasswordResetEmail(options: PasswordResetEmailOptions): Promise<EmailResult> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || 'Receipto <security@resend.dev>';
+
+  if (!apiKey) {
+    return { success: false, configured: false, statusText: 'Email service is not configured.' };
+  }
+
+  const safeName = escapeHtml(options.name || 'there');
+  const safeOtp = escapeHtml(options.otp);
+  const subject = `Receipto Password Reset Code: ${safeOtp}`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #0f172a; background-color: #f8fafc; margin: 0; padding: 24px; }
+          .container { max-width: 520px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+          .header { background: #0f172a; color: #ffffff; padding: 28px 32px; }
+          .content { padding: 32px; }
+          .otp-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 20px; text-align: center; margin: 24px 0; }
+          .otp-code { font-family: ui-monospace, monospace; font-size: 34px; font-weight: 800; letter-spacing: 0.3em; color: #0f172a; }
+          .footer { padding: 20px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff;">Receipto Security</h1>
+            <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 13px;">Password Reset Request</p>
+          </div>
+          <div class="content">
+            <p>Hello ${safeName},</p>
+            <p>We received a request to reset the password for your Receipto account. Enter the 6-digit verification code below:</p>
+            <div class="otp-box">
+              <div class="otp-code">${safeOtp}</div>
+              <div style="font-size: 12px; color: #64748b; margin-top: 8px;">Code expires in <strong>10 minutes</strong>.</div>
+            </div>
+            <p style="font-size: 13px; color: #64748b;">If you did not request a password reset, no further action is needed &mdash; your account remains secure.</p>
+          </div>
+          <div class="footer">&copy; ${new Date().getFullYear()} Receipto. All rights reserved.</div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `Receipto - Password Reset\n\nHello ${options.name || 'there'},\nYour password reset code is: ${options.otp}\nThis code expires in 10 minutes.\nIf you did not make this request, you can safely ignore this email.\n\n--\nReceipto Security`;
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: fromEmail, to: [options.to], subject, html, text }),
+    });
+    const data = await response.json() as any;
+    if (!response.ok) return { success: false, configured: true, statusText: data?.message || 'Failed' };
+    return { success: true, configured: true, messageId: data.id, statusText: 'Password reset code dispatched.' };
+  } catch (err: any) {
+    return { success: false, configured: true, statusText: err.message };
+  }
+}
+
+// ----------------------------------------------------
+// Overdue Invoice Reminder Helper
+// ----------------------------------------------------
+export async function sendOverdueReminderEmail(options: SendReminderOptions): Promise<EmailResult> {
+  return sendReminderEmail({
+    ...options,
+    tone: 'urgent',
+  });
+}
+
 
 

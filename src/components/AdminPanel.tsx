@@ -502,7 +502,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
 
                     <div>
                       <div className="flex justify-between text-sm mb-1">
-                        <span className="font-medium text-purple-600 dark:text-purple-400">Growth Plan ($29/mo)</span>
+                        <span className="font-medium text-purple-600 dark:text-purple-400">Growth Plan ($24/mo)</span>
                         <span className="text-slate-500 dark:text-slate-400 font-semibold">{stats.growth_users} users</span>
                       </div>
                       <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">

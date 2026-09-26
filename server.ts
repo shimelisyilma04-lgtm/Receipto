@@ -1,14 +1,17 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import path from 'path';
 import cookieParser from 'cookie-parser';
 import { createServer as createViteServer } from 'vite';
-import { router, healthHandler } from './server/routes.js';
+import { router, healthHandler, readinessHandler } from './server/routes.js';
 import { initDatabase } from './server/db.js';
 import { startReminderWorker } from './server/worker.js';
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Middlewares
   app.use(express.json({
@@ -27,8 +30,9 @@ async function startServer() {
     next();
   });
 
-  // Root health check endpoint (GET /health)
+  // Root health & readiness check endpoints
   app.get('/health', healthHandler);
+  app.get('/system/readiness', readinessHandler);
 
   // Mount API routes under /api
   app.use('/api', router);

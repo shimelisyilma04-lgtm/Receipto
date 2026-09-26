@@ -79,33 +79,19 @@ export function EmailVerificationView({
 
   // Expiration countdown (10 minutes)
   useEffect(() => {
-    if (secondsRemaining <= 0) return;
     const interval = setInterval(() => {
-      setSecondsRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
+      setSecondsRemaining((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(interval);
-  }, [secondsRemaining]);
+  }, []);
 
   // Resend cooldown countdown (60 seconds)
   useEffect(() => {
-    if (resendCooldown <= 0) return;
     const interval = setInterval(() => {
-      setResendCooldown((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(interval);
-  }, [resendCooldown]);
+  }, []);
 
   const isExpired = secondsRemaining === 0;
 
@@ -255,12 +241,14 @@ export function EmailVerificationView({
       inputRefs.current[0]?.focus();
 
       if (res.email_delivery === 'sent' || res.email_sent) {
-        onShowToast(`A new verification code was sent to ${activeEmail}`, 'success');
+        onShowToast('Verification email sent', 'success');
+      } else if (res.email_delivery === 'error') {
+        onShowToast('Unable to send verification email. Please try again.', 'error');
       } else {
-        onShowToast('New verification code generated.', 'info');
+        onShowToast('Email provider not configured. Verification code generated.', 'info');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to resend verification code. Please try again.');
+      setError(err.message || 'Unable to send verification email. Please try again.');
     } finally {
       setResending(false);
     }
@@ -340,7 +328,7 @@ export function EmailVerificationView({
             <div className="mb-6 p-4 rounded-xl bg-emerald-950/40 border border-emerald-800/80 text-emerald-200 text-xs flex flex-col gap-1">
               <div className="flex items-center gap-2 font-semibold text-emerald-300">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Verification code sent</span>
+                <span>Verification email sent</span>
               </div>
               <p className="text-emerald-300/80 text-[13px]">
                 Check your inbox for your 6-digit code.
@@ -352,10 +340,10 @@ export function EmailVerificationView({
             <div className="mb-6 p-4 rounded-xl bg-rose-950/40 border border-rose-800/80 text-rose-200 text-xs flex flex-col gap-2">
               <div className="flex items-center gap-2 font-semibold text-rose-300">
                 <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                <span>We couldn't send your verification email.</span>
+                <span>Unable to send verification email. Please try again.</span>
               </div>
               <p className="text-rose-300/80 text-[13px]">
-                Please try again in a moment.
+                We could not deliver the message to your inbox. Check your address or retry.
               </p>
               <button
                 type="button"

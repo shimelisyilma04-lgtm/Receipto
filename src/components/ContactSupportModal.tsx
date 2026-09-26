@@ -123,7 +123,7 @@ export function ContactSupportModal({ isOpen, onClose, userEmail }: ContactSuppo
               <MessageSquare className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
               <div>
                 <span className="font-semibold text-slate-800 dark:text-slate-200 block">Dedicated Support</span>
-                <span>Assistance with reminder delivery, custom schedules, and Stripe.</span>
+                <span>Assistance with reminder delivery, custom schedules, and billing.</span>
               </div>
             </div>
           </div>

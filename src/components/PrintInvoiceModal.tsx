@@ -1,7 +1,8 @@
-import React from 'react';
-import { X, Printer, Download, CheckCircle, AlertTriangle, Building2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Printer, Download, CheckCircle, AlertTriangle, Building2, Loader2 } from 'lucide-react';
 import type { Invoice, User } from '../types.js';
 import { ReceiptoLogo } from './ReceiptoLogo.js';
+import { getStoredToken } from '../api.js';
 
 interface PrintInvoiceModalProps {
   invoice: Invoice | null;
@@ -10,21 +11,16 @@ interface PrintInvoiceModalProps {
 }
 
 export function PrintInvoiceModal({ invoice, currentUser, onClose }: PrintInvoiceModalProps) {
+  const [isOpening, setIsOpening] = useState(false);
   if (!invoice) return null;
 
   function handlePrint() {
-    window.print();
-  }
-
-  function handleDownloadJson() {
-    if (!invoice) return;
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(invoice, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `Invoice-${invoice.invoice_number}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
+    if (!invoice || isOpening) return;
+    setIsOpening(true);
+    const token = getStoredToken();
+    const url = `/api/invoices/${invoice.id}/print${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    window.open(url, '_blank');
+    setTimeout(() => setIsOpening(false), 1500);
   }
 
   const isPaid = invoice.payment_status === 'PAID';
@@ -50,19 +46,12 @@ export function PrintInvoiceModal({ invoice, currentUser, onClose }: PrintInvoic
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handleDownloadJson}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition"
-              title="Download JSON Record"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export JSON</span>
-            </button>
-            <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition shadow-xs"
+              disabled={isOpening}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold transition shadow-xs cursor-pointer"
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print Invoice</span>
+              {isOpening ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
+              <span>{isOpening ? 'Opening Print...' : 'Print / Save PDF'}</span>
             </button>
             <button
               onClick={onClose}
@@ -192,7 +181,7 @@ export function PrintInvoiceModal({ invoice, currentUser, onClose }: PrintInvoic
             <p>Thank you for your business! Please send payments promptly as specified by invoice terms.</p>
             <div className="flex items-center gap-2 mt-1">
               <ReceiptoLogo size="xs" />
-              <span>Generated electronically by <strong>Receipto</strong> v1.1.0</span>
+              <span>Generated electronically by <strong>Receipto</strong></span>
             </div>
           </div>
         </div>

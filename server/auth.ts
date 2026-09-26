@@ -103,35 +103,69 @@ export interface AuthenticatedRequest extends Request {
   sessionToken?: string;
 }
 
+function sendAuthError(req: AuthenticatedRequest, res: Response, status: number, errorMsg: string) {
+  const isPrintRequest = req.path.endsWith('/print') || (req.accepts('html') && !req.xhr && !req.headers.accept?.includes('application/json'));
+  if (isPrintRequest) {
+    return res.status(status).setHeader('Content-Type', 'text/html; charset=utf-8').send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Receipto - Authentication Required</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #0f172a; text-align: center; padding: 60px 20px; }
+    .card { max-width: 480px; margin: 0 auto; background: #fff; padding: 40px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    h2 { font-size: 20px; font-weight: 700; margin-bottom: 12px; color: #0f172a; }
+    p { font-size: 14px; color: #64748b; margin-bottom: 24px; line-height: 1.6; }
+    .btn { display: inline-block; padding: 10px 20px; background: #4f46e5; color: #fff; border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 14px; }
+    .btn:hover { background: #4338ca; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Please Log In to View Invoice</h2>
+    <p>${errorMsg}</p>
+    <a href="/?login=true" class="btn">Log in to Receipto</a>
+  </div>
+</body>
+</html>`);
+  }
+  return res.status(status).json({ error: errorMsg });
+}
+
 export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-  const cookieVal = req.cookies?.[COOKIE_NAME] || req.headers['authorization']?.replace('Bearer ', '');
+  let cookieVal = req.cookies?.[COOKIE_NAME] || req.headers['authorization']?.replace('Bearer ', '');
+  if (!cookieVal && req.query?.token && typeof req.query.token === 'string') {
+    cookieVal = req.query.token;
+  }
+
   if (!cookieVal) {
-    return res.status(401).json({ error: 'Authentication required. Please log in.' });
+    return sendAuthError(req, res, 401, 'Authentication required. Please log in.');
   }
 
   let token: string | null = null;
-  // If passed from cookie, unsign it
+  // If passed from cookie, try unsigning it
   if (cookieVal.includes('.')) {
     token = unsignToken(cookieVal);
-  } else {
-    // If passed as raw Bearer token in headers (e.g. from tests or API clients)
+  }
+  if (!token) {
     token = cookieVal;
   }
 
   if (!token) {
-    return res.status(401).json({ error: 'Invalid or tampered session cookie.' });
+    return sendAuthError(req, res, 401, 'Invalid or tampered session cookie.');
   }
 
   try {
     const session = await getSession(token);
     if (!session) {
       clearAuthCookie(res);
-      return res.status(401).json({ error: 'Session expired or invalidated. Please log in again.' });
+      return sendAuthError(req, res, 401, 'Session expired or invalidated. Please log in again.');
     }
 
     if (session.user.status === 'SUSPENDED') {
       clearAuthCookie(res);
-      return res.status(403).json({ error: 'Your account has been suspended. Please contact support.' });
+      return sendAuthError(req, res, 403, 'Your account has been suspended. Please contact support.');
     }
 
     req.user = session.user;

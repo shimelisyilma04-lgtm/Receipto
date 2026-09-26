@@ -42,6 +42,7 @@ import {
   recordProcessedWebhookEvent,
   getSubscriptionByCustomerId,
   getSubscriptionByProviderSubId,
+  getUserByPaddleCustomerId,
   updateUserLastLogin,
   getAdminDashboardStats,
   getAdminUsers,
@@ -51,20 +52,35 @@ import {
   getAdminSubscriptions,
   getAdminActivityLogs,
   getAdminSystemHealth,
+  updateOwnerDemoPlan,
+  createEmailVerification,
+  getLatestEmailVerification,
+  markVerificationUsed,
+  recordVerificationAttempt,
 } from './db.js';
 import {
-  isStripeConfigured,
-  createStripeCheckoutSession,
-  createStripePortalSession,
-  retrieveStripeCheckoutSession,
-  constructStripeWebhookEvent,
-} from './stripe.js';
+  isPaddleConfigured,
+  isPaddleWebhookConfigured,
+  getPaddleEnvironment,
+  getPaddleClientToken,
+  getPaddlePriceId,
+  getCheckoutParams,
+  verifyPaddleWebhookSignature,
+  parsePaddleWebhookEvent,
+  cancelPaddleSubscription,
+  getPaddleSubscription,
+  mapPaddlePriceToPlan,
+  isPaddleIpAllowed,
+} from './paddle.js';
 import {
   PLAN_CONFIGS,
   type PlanTier,
   type BillingInterval,
   getEffectivePlan,
   isPaidSubscriptionActive,
+  isOwnerAccount,
+  PlanLimitExceededError,
+  getPlanLimitReachedMessage,
 } from './plans.js';
 import {
   hashPassword,
@@ -83,6 +99,12 @@ import {
   verifyUserOTP,
   resendVerificationCode,
   RESEND_COOLDOWN_SECONDS,
+  generateSecureOTP,
+  generateSalt,
+  hashOTP,
+  verifyOTPHash,
+  OTP_EXPIRATION_MINUTES,
+  MAX_VERIFICATION_ATTEMPTS,
 } from './verification.js';
 import {
   sendReminderEmail,
@@ -91,8 +113,11 @@ import {
   sendSubscriptionConfirmationEmail,
   sendPaymentFailureEmail,
   sendSubscriptionCancelledEmail,
+  sendWelcomeEmail,
+  sendPasswordResetEmail,
 } from './email.js';
 import { getWorkerStatus, runWorkerCycle } from './worker.js';
+import { evaluateProductionReadiness } from './readiness.js';
 
 export const router = express.Router();
 
@@ -109,7 +134,7 @@ function isValidDate(dateStr: string): boolean {
 }
 
 // ==========================================
-// 1. HEALTH CHECKS
+// 1. HEALTH & READINESS CHECKS
 // ==========================================
 export async function healthHandler(req: Request, res: Response) {
   try {
@@ -117,7 +142,7 @@ export async function healthHandler(req: Request, res: Response) {
     res.status(200).json({
       status: 'ok',
       app: 'Receipto',
-      version: '1.1.0',
+      version: '1.2.0',
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development',
       database: {
@@ -140,7 +165,15 @@ export async function healthHandler(req: Request, res: Response) {
   }
 }
 
+export function readinessHandler(req: Request, res: Response) {
+  const report = evaluateProductionReadiness();
+  const statusCode = report.overall_ready ? 200 : 200; // Returns full structured report
+  res.status(statusCode).json(report);
+}
+
 router.get('/health', healthHandler);
+router.get('/system/readiness', readinessHandler);
+router.get('/readiness', readinessHandler);
 
 // ==========================================
 // 2. AUTHENTICATION ROUTES
@@ -314,7 +347,8 @@ router.post('/auth/login', authRateLimiter, async (req: Request, res: Response) 
 // POST /api/auth/verify-email
 router.post('/auth/verify-email', authRateLimiter, optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { code, email, user_id } = req.body;
+    const { code: rawCode, otp, email, user_id } = req.body;
+    const code = rawCode || otp;
 
     if (!code || typeof code !== 'string') {
       return res.status(400).json({ error: 'A 6-digit verification code is required.' });
@@ -352,6 +386,13 @@ router.post('/auth/verify-email', authRateLimiter, optionalAuth, async (req: Aut
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     await createSession(verifiedUser.id, token, expiresAt);
     setAuthCookie(req, res, token, expiresAt);
+
+    // Dispatch welcome email via Resend in background
+    sendWelcomeEmail({
+      to: verifiedUser.email,
+      name: verifiedUser.name,
+      businessName: verifiedUser.business_name,
+    }).catch((err) => console.warn('[Welcome Email Notice]', err.message));
 
     return res.status(200).json({
       success: true,
@@ -579,6 +620,110 @@ router.post('/auth/password', requireAuth, async (req: AuthenticatedRequest, res
   }
 });
 
+// POST /api/auth/forgot-password
+router.post('/auth/forgot-password', authRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email || !isValidEmail(email)) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await getUserByEmail(cleanEmail);
+
+    if (user) {
+      const otp = generateSecureOTP();
+      const salt = generateSalt();
+      const otpHash = hashOTP(otp, salt);
+      const expiresAt = new Date(Date.now() + OTP_EXPIRATION_MINUTES * 60 * 1000).toISOString();
+
+      await createEmailVerification({
+        user_id: user.id,
+        email: user.email,
+        otp_hash: otpHash,
+        salt,
+        expires_at: expiresAt,
+        purpose: 'password_reset',
+      });
+
+      sendPasswordResetEmail({
+        to: user.email,
+        name: user.name,
+        otp,
+      }).catch((err) => console.warn('[Password Reset Email Error]', err.message));
+    }
+
+    // Privacy-preserving response (does not reveal user existence)
+    res.status(200).json({
+      success: true,
+      message: 'If an account exists with that email address, password reset instructions have been sent.',
+    });
+  } catch (err: any) {
+    console.error('[Forgot Password Error]', err);
+    res.status(500).json({ error: 'Failed to process password reset request.' });
+  }
+});
+
+// POST /api/auth/reset-password
+router.post('/auth/reset-password', authRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { email, otp, new_password } = req.body;
+
+    if (!email || !isValidEmail(email)) {
+      return res.status(400).json({ error: 'Valid email address is required.' });
+    }
+
+    if (!otp || typeof otp !== 'string' || otp.trim().length !== 6) {
+      return res.status(400).json({ error: 'Valid 6-digit verification code is required.' });
+    }
+
+    if (!new_password || typeof new_password !== 'string' || new_password.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters long.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await getUserByEmail(cleanEmail);
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired password reset code.' });
+    }
+
+    const verification = await getLatestEmailVerification(user.id, 'password_reset');
+    if (!verification || verification.used_at) {
+      return res.status(400).json({ error: 'No active password reset request found. Please request a new one.' });
+    }
+
+    if (new Date() > new Date(verification.expires_at)) {
+      return res.status(400).json({ error: 'Password reset code has expired. Please request a new one.' });
+    }
+
+    if (verification.attempt_count >= MAX_VERIFICATION_ATTEMPTS) {
+      return res.status(400).json({ error: 'Maximum verification attempts exceeded. Please request a new code.' });
+    }
+
+    await recordVerificationAttempt(verification.id);
+
+    const isValid = verifyOTPHash(otp.trim(), verification.otp_hash, verification.salt);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Invalid verification code.' });
+    }
+
+    const newHash = await hashPassword(new_password);
+    await updateUserPassword(user.id, newHash);
+    await markVerificationUsed(verification.id);
+    await deleteUserSessions(user.id);
+
+    await createActivityLog(user.id, 'PASSWORD_RESET', 'Password successfully reset via email verification');
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully. You can now log in with your new password.',
+    });
+  } catch (err: any) {
+    console.error('[Reset Password Error]', err);
+    res.status(500).json({ error: 'Failed to reset password.' });
+  }
+});
+
 // ==========================================
 // PROTECTED APPLICATION ROUTE ENFORCEMENT
 // ==========================================
@@ -617,12 +762,15 @@ router.post('/clients', requireAuth, async (req: AuthenticatedRequest, res: Resp
     const limitCheck = await checkCanCreateClient(userId);
     if (!limitCheck.allowed) {
       return res.status(403).json({
-        error: limitCheck.reason,
+        error: 'PLAN_LIMIT_REACHED',
         code: 'PLAN_LIMIT_REACHED',
+        resource: 'clients',
         limit_type: 'clients',
         current: limitCheck.current,
+        limit: limitCheck.max,
         max: limitCheck.max,
         plan: limitCheck.plan,
+        message: limitCheck.reason,
         upgrade_required: true,
       });
     }
@@ -648,6 +796,20 @@ router.post('/clients', requireAuth, async (req: AuthenticatedRequest, res: Resp
     res.status(201).json({ client });
   } catch (err: any) {
     console.error('[Create Client Error]', err);
+    if (err instanceof PlanLimitExceededError || err.code === 'PLAN_LIMIT_REACHED') {
+      return res.status(403).json({
+        error: 'PLAN_LIMIT_REACHED',
+        code: 'PLAN_LIMIT_REACHED',
+        resource: 'clients',
+        limit_type: 'clients',
+        current: err.current,
+        limit: err.limit,
+        max: err.limit,
+        plan: err.plan,
+        message: err.message,
+        upgrade_required: true,
+      });
+    }
     res.status(500).json({ error: 'Failed to create client.' });
   }
 });
@@ -743,14 +905,15 @@ router.get('/invoices', requireAuth, async (req: AuthenticatedRequest, res: Resp
   }
 });
 
-// GET /api/invoices/export/csv
-router.get('/invoices/export/csv', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+// GET /api/invoices/export/csv and GET /api/invoices/export.csv
+router.get(['/invoices/export/csv', '/invoices/export.csv'], requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const accessCheck = await checkFeatureAccess(userId, 'csvExport');
     if (!accessCheck.allowed) {
       return res.status(403).json({
-        error: 'CSV invoice export is a premium feature available on Starter and Growth plans.',
+        success: false,
+        error: 'CSV invoice export is available on Starter and Growth plans.',
         code: 'FEATURE_LOCKED',
         feature: 'csvExport',
         plan: accessCheck.plan,
@@ -759,31 +922,58 @@ router.get('/invoices/export/csv', requireAuth, async (req: AuthenticatedRequest
     }
 
     const invoices = await getInvoices(userId);
-    const header = ['Invoice Number', 'Client Name', 'Client Email', 'Company', 'Amount', 'Currency', 'Issue Date', 'Due Date', 'Status', 'Paid Date', 'Notes'];
-    const rows = invoices.map(inv => [
-      inv.invoice_number,
-      inv.client_name || '',
-      inv.client_email || '',
-      inv.client_company || '',
-      inv.amount.toFixed(2),
-      inv.currency,
-      inv.issue_date,
-      inv.due_date,
-      inv.payment_status,
-      inv.paid_date ? inv.paid_date.split('T')[0] : '',
-      (inv.notes || '').replace(/"/g, '""'),
-    ].map(val => `"${val}"`).join(','));
+    const escapeCsvCell = (val: any): string => {
+      if (val === null || val === undefined) return '""';
+      let str = String(val);
+      // Protect against CSV / Spreadsheet formula injection (unless it's a valid numeric value)
+      const isPureNumber = /^-?\d+(\.\d+)?$/.test(str.trim());
+      if (!isPureNumber && /^[=+\-@\t\r]/.test(str)) {
+        str = `'${str}`;
+      }
+      return `"${str.replace(/"/g, '""')}"`;
+    };
 
-    const csvContent = [header.map(h => `"${h}"`).join(','), ...rows].join('\r\n');
+    const header = [
+      'Invoice Number',
+      'Client Name',
+      'Client Email',
+      'Company',
+      'Amount',
+      'Currency',
+      'Issue Date',
+      'Due Date',
+      'Payment Status',
+      'Paid Date',
+      'Notes',
+    ];
+
+    const rows = invoices.map((inv) =>
+      [
+        escapeCsvCell(inv.invoice_number),
+        escapeCsvCell(inv.client_name || ''),
+        escapeCsvCell(inv.client_email || ''),
+        escapeCsvCell(inv.client_company || ''),
+        escapeCsvCell(inv.amount.toFixed(2)),
+        escapeCsvCell(inv.currency),
+        escapeCsvCell(inv.issue_date),
+        escapeCsvCell(inv.due_date),
+        escapeCsvCell(inv.payment_status),
+        escapeCsvCell(inv.paid_date ? inv.paid_date.split('T')[0] : ''),
+        escapeCsvCell(inv.notes || ''),
+      ].join(',')
+    );
+
+    const csvContent = [header.map((h) => escapeCsvCell(h)).join(','), ...rows].join('\r\n');
 
     await createActivityLog(userId, 'CSV_EXPORTED', `Exported ${invoices.length} invoices to CSV`);
 
+    const dateStr = new Date().toISOString().split('T')[0];
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="receipto-invoices-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="receipto-invoices-${dateStr}.csv"`);
     res.status(200).send(csvContent);
   } catch (err: any) {
     console.error('[CSV Export Error]', err);
-    res.status(500).json({ error: 'Failed to generate invoice export CSV.' });
+    res.status(500).json({ success: false, error: 'Failed to generate invoice export CSV.' });
   }
 });
 
@@ -797,12 +987,15 @@ router.post('/invoices', requireAuth, async (req: AuthenticatedRequest, res: Res
     const limitCheck = await checkCanCreateInvoice(userId);
     if (!limitCheck.allowed) {
       return res.status(403).json({
-        error: limitCheck.reason,
+        error: 'PLAN_LIMIT_REACHED',
         code: 'PLAN_LIMIT_REACHED',
+        resource: 'invoices',
         limit_type: 'invoices',
         current: limitCheck.current,
+        limit: limitCheck.max,
         max: limitCheck.max,
         plan: limitCheck.plan,
+        message: limitCheck.reason,
         upgrade_required: true,
       });
     }
@@ -867,26 +1060,547 @@ router.post('/invoices', requireAuth, async (req: AuthenticatedRequest, res: Res
     });
   } catch (err: any) {
     console.error('[Create Invoice Error]', err);
+    if (err instanceof PlanLimitExceededError || err.code === 'PLAN_LIMIT_REACHED') {
+      return res.status(403).json({
+        error: 'PLAN_LIMIT_REACHED',
+        code: 'PLAN_LIMIT_REACHED',
+        resource: 'invoices',
+        limit_type: 'invoices',
+        current: err.current,
+        limit: err.limit,
+        max: err.limit,
+        plan: err.plan,
+        message: err.message,
+        upgrade_required: true,
+      });
+    }
     res.status(500).json({ error: 'Failed to create invoice.' });
   }
 });
+
+function renderInvoiceNotFoundHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Invoice Not Found - Receipto</title>
+  <style>body{font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:60px 20px;color:#1e293b;background:#f8fafc;}.card{max-width:480px;margin:0 auto;background:#fff;padding:40px;border-radius:12px;border:1px solid #e2e8f0;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);}</style>
+</head>
+<body>
+  <div class="card">
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:12px;color:#0f172a;">Invoice Not Found</h2>
+    <p style="font-size:14px;color:#64748b;margin-bottom:24px;line-height:1.6;">The requested invoice does not exist or you do not have permission to view it.</p>
+    <a href="/" style="display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;border-radius:8px;font-weight:600;text-decoration:none;font-size:14px;">Return to Receipto</a>
+  </div>
+</body>
+</html>`;
+}
+
+function renderInvoiceErrorHtml(message: string = 'An error occurred generating the printable invoice.'): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Print Error - Receipto</title>
+  <style>body{font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:60px 20px;color:#1e293b;background:#f8fafc;}.card{max-width:480px;margin:0 auto;background:#fff;padding:40px;border-radius:12px;border:1px solid #e2e8f0;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);}</style>
+</head>
+<body>
+  <div class="card">
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:12px;color:#e11d48;">Unable to Load Printable Invoice</h2>
+    <p style="font-size:14px;color:#64748b;margin-bottom:24px;line-height:1.6;">${escapeHtml(message)} Please try again.</p>
+    <a href="/" style="display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;border-radius:8px;font-weight:600;text-decoration:none;font-size:14px;">Return to Receipto</a>
+  </div>
+</body>
+</html>`;
+}
+
+function renderInvoicePrintHtml(invoice: any, client: any, user: any): string {
+  const isPaid = invoice.payment_status === 'PAID';
+  const isOverdue = invoice.payment_status === 'OVERDUE';
+  const isCancelled = invoice.payment_status === 'CANCELLED';
+
+  let statusBg = '#fffbeb';
+  let statusText = '#92400e';
+  let statusBorder = '#fde68a';
+  if (isPaid) {
+    statusBg = '#ecfdf5';
+    statusText = '#065f46';
+    statusBorder = '#a7f3d0';
+  } else if (isOverdue) {
+    statusBg = '#fff1f2';
+    statusText = '#9f1239';
+    statusBorder = '#fecdd3';
+  } else if (isCancelled) {
+    statusBg = '#f1f5f9';
+    statusText = '#475569';
+    statusBorder = '#cbd5e1';
+  }
+
+  const formattedAmount = `${invoice.currency} $${Number(invoice.amount || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice #${escapeHtml(invoice.invoice_number)} - Receipto</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      padding: 0;
+      margin: 0;
+    }
+    .no-print {
+      background-color: #ffffff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .no-print-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-title {
+      font-weight: 700;
+      font-size: 15px;
+      color: #0f172a;
+    }
+    .brand-hint {
+      font-size: 12px;
+      color: #64748b;
+    }
+    .no-print-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease-in-out;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background-color: #4f46e5;
+      color: #ffffff;
+    }
+    .btn-primary:hover {
+      background-color: #4338ca;
+    }
+    .btn-secondary {
+      background-color: #ffffff;
+      color: #334155;
+      border-color: #cbd5e1;
+    }
+    .btn-secondary:hover {
+      background-color: #f1f5f9;
+    }
+    .page-container {
+      max-width: 820px;
+      margin: 28px auto 40px auto;
+      padding: 0 16px;
+    }
+    .invoice-card {
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+      padding: 48px;
+    }
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #f1f5f9;
+      padding-bottom: 28px;
+      margin-bottom: 32px;
+    }
+    .company-name {
+      font-size: 24px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+    }
+    .company-sub {
+      font-size: 13px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+    .invoice-badge-title {
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      color: #0f172a;
+      text-align: right;
+    }
+    .meta-list {
+      margin-top: 8px;
+      text-align: right;
+      font-size: 13px;
+      color: #475569;
+    }
+    .meta-list span {
+      font-weight: 600;
+      color: #0f172a;
+    }
+    .status-pill {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-radius: 9999px;
+      background-color: ${statusBg};
+      color: ${statusText};
+      border: 1px solid ${statusBorder};
+    }
+    .parties-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      margin-bottom: 36px;
+    }
+    .party-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+    .party-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .party-detail {
+      font-size: 13px;
+      color: #475569;
+      margin-top: 2px;
+      white-space: pre-line;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 32px;
+    }
+    .items-table th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #64748b;
+      padding: 12px 16px;
+      background-color: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .items-table th.text-right, .items-table td.text-right {
+      text-align: right;
+    }
+    .items-table td {
+      padding: 16px;
+      font-size: 14px;
+      color: #1e293b;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .totals-area {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 36px;
+    }
+    .totals-box {
+      width: 280px;
+    }
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 13px;
+      color: #475569;
+    }
+    .totals-grand {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      font-size: 18px;
+      font-weight: 800;
+      color: #0f172a;
+      border-top: 2px solid #e2e8f0;
+      margin-top: 6px;
+    }
+    .notes-box {
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 32px;
+    }
+    .notes-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+    .notes-content {
+      font-size: 13px;
+      color: #334155;
+      white-space: pre-line;
+    }
+    .footer-note {
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 24px;
+    }
+    @media print {
+      body {
+        background-color: #ffffff !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .page-container {
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      .invoice-card {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+      }
+      @page {
+        margin: 12mm;
+        size: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <div class="no-print-left">
+      <span class="brand-title">Receipto Printable Invoice</span>
+      <span class="brand-hint">Invoice #${escapeHtml(invoice.invoice_number)}</span>
+    </div>
+    <div class="no-print-actions">
+      <button class="btn btn-primary" onclick="window.print()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+        Print / Save PDF
+      </button>
+      <button class="btn btn-secondary" onclick="window.close()">✕ Close</button>
+    </div>
+  </div>
+
+  <div class="page-container">
+    <div class="invoice-card">
+      <div class="header-row">
+        <div>
+          <div class="company-name">${escapeHtml(user.business_name || user.name || 'Receipto Merchant')}</div>
+          <div class="company-sub">Billed by: ${escapeHtml(user.name || '')} &bull; ${escapeHtml(user.email || '')}</div>
+        </div>
+
+        <div>
+          <div class="invoice-badge-title">INVOICE</div>
+          <div class="meta-list">
+            <div>Invoice No: <span>#${escapeHtml(invoice.invoice_number)}</span></div>
+            <div>Issue Date: <span>${escapeHtml(invoice.issue_date || 'N/A')}</span></div>
+            <div>Due Date: <span>${escapeHtml(invoice.due_date || 'N/A')}</span></div>
+            ${
+              invoice.paid_date
+                ? `<div>Paid Date: <span>${escapeHtml(invoice.paid_date.split('T')[0])}</span></div>`
+                : ''
+            }
+            <div><span class="status-pill">${escapeHtml(invoice.payment_status || 'UNPAID')}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="parties-grid">
+        <div>
+          <div class="party-title">Billed From</div>
+          <div class="party-name">${escapeHtml(user.business_name || user.name || 'Merchant')}</div>
+          <div class="party-detail">${escapeHtml(user.email || '')}</div>
+        </div>
+
+        <div>
+          <div class="party-title">Billed To</div>
+          <div class="party-name">${escapeHtml(client?.name || invoice.client_name || 'Client')}</div>
+          ${
+            client?.company || invoice.client_company
+              ? `<div class="party-detail"><strong>${escapeHtml(client?.company || invoice.client_company || '')}</strong></div>`
+              : ''
+          }
+          <div class="party-detail">${escapeHtml(client?.email || invoice.client_email || '')}</div>
+          ${
+            client?.address
+              ? `<div class="party-detail">${escapeHtml(client.address)}</div>`
+              : ''
+          }
+          ${
+            client?.phone
+              ? `<div class="party-detail">${escapeHtml(client.phone)}</div>`
+              : ''
+          }
+        </div>
+      </div>
+
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Item & Description</th>
+            <th class="text-right">Qty</th>
+            <th class="text-right">Rate</th>
+            <th class="text-right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <strong>Professional Services / Products Deliverable</strong><br>
+              <span style="font-size: 12px; color: #64748b;">As referenced in invoice #${escapeHtml(invoice.invoice_number)}</span>
+            </td>
+            <td class="text-right">1</td>
+            <td class="text-right">${formattedAmount}</td>
+            <td class="text-right"><strong>${formattedAmount}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="totals-area">
+        <div class="totals-box">
+          <div class="totals-row">
+            <span>Subtotal</span>
+            <span>${formattedAmount}</span>
+          </div>
+          <div class="totals-row">
+            <span>Tax (0.00%)</span>
+            <span>${invoice.currency} $0.00</span>
+          </div>
+          <div class="totals-grand">
+            <span>Total Due</span>
+            <span>${formattedAmount}</span>
+          </div>
+        </div>
+      </div>
+
+      ${
+        invoice.notes
+          ? `<div class="notes-box">
+              <div class="notes-title">Notes & Payment Instructions</div>
+              <div class="notes-content">${escapeHtml(invoice.notes)}</div>
+            </div>`
+          : ''
+      }
+
+      <div class="footer-note">
+        Thank you for your business. For any questions regarding this invoice, please contact ${escapeHtml(user.email || 'support')}.<br>
+        <span style="font-size: 11px; color: #cbd5e1;">Generated by Receipto</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Trigger native browser print dialog on load
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        try {
+          window.print();
+        } catch (e) {
+          console.log('Auto print prevented by browser environment.');
+        }
+      }, 350);
+    });
+  </script>
+</body>
+</html>`;
+}
 
 // GET /api/invoices/:id
 router.get('/invoices/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const invoice = await getInvoiceById(userId, req.params.id);
+    const wantsHtml = req.accepts('html') && !req.xhr && !req.headers.accept?.includes('application/json');
+
     if (!invoice) {
+      if (wantsHtml) {
+        return res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderInvoiceNotFoundHtml());
+      }
       return res.status(404).json({ error: 'Invoice not found or does not belong to your account.' });
     }
+
+    if (wantsHtml) {
+      const client = await getClientById(userId, invoice.client_id);
+      const user = req.user!;
+      const html = renderInvoicePrintHtml(invoice, client, user);
+      await createActivityLog(userId, 'INVOICE_PRINTED', `Viewed printable invoice #${invoice.invoice_number}`);
+      return res.status(200).setHeader('Content-Type', 'text/html; charset=utf-8').send(html);
+    }
+
     res.status(200).json({ invoice });
   } catch (err: any) {
+    const wantsHtml = req.accepts('html') && !req.xhr && !req.headers.accept?.includes('application/json');
+    if (wantsHtml) {
+      return res.status(500).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderInvoiceErrorHtml());
+    }
     res.status(500).json({ error: 'Failed to retrieve invoice.' });
   }
 });
 
+// GET /api/invoices/:id/print
+router.get('/invoices/:id/print', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const invoice = await getInvoiceById(userId, req.params.id);
+    if (!invoice) {
+      return res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderInvoiceNotFoundHtml());
+    }
+
+    const client = await getClientById(userId, invoice.client_id);
+    const user = req.user!;
+    const html = renderInvoicePrintHtml(invoice, client, user);
+
+    await createActivityLog(userId, 'INVOICE_PRINTED', `Printed invoice #${invoice.invoice_number}`);
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.status(200).send(html);
+  } catch (err: any) {
+    console.error('[Print Invoice Error]', err);
+    res.status(500).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderInvoiceErrorHtml());
+  }
+});
+
 // PUT /api/invoices/:id
-router.put('/api/invoices/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.put('/invoices/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { client_id, invoice_number, amount, currency, issue_date, due_date, notes } = req.body;
@@ -1166,6 +1880,7 @@ router.post('/reminders/send', requireAuth, async (req: AuthenticatedRequest, re
       status = 'FAILED';
     }
 
+    const now = new Date().toISOString();
     const reminder = await createReminder(userId, {
       invoice_id: invoice.id,
       client_id: client.id,
@@ -1173,6 +1888,11 @@ router.post('/reminders/send', requireAuth, async (req: AuthenticatedRequest, re
       subject,
       message: text,
       status,
+      reminder_type: 'manual',
+      sent_at: emailResult.success ? now : null,
+      attempted_at: now,
+      provider_message_id: emailResult.messageId,
+      attempt_count: 1,
       error_message: emailResult.error || (!emailResult.configured ? emailResult.statusText : undefined),
     });
 
@@ -1183,12 +1903,21 @@ router.post('/reminders/send', requireAuth, async (req: AuthenticatedRequest, re
       { reminderId: reminder.id, status, configured: emailResult.configured }
     );
 
-    res.status(200).json({
-      success: emailResult.success,
-      configured: emailResult.configured,
-      message: emailResult.statusText,
-      reminder,
-    });
+    if (emailResult.success) {
+      return res.status(200).json({
+        success: true,
+        code: 'EMAIL_SENT',
+        message: 'Reminder email sent.',
+        reminder,
+      });
+    } else {
+      return res.status(200).json({
+        success: false,
+        code: 'EMAIL_PROVIDER_ERROR',
+        message: 'Email could not be sent. Please check your email configuration.',
+        reminder,
+      });
+    }
   } catch (err: any) {
     console.error('[Send Reminder Error]', err);
     res.status(500).json({ error: 'Failed to process reminder request.' });
@@ -1236,6 +1965,7 @@ router.post('/reminders/automate', requireAuth, async (req: AuthenticatedRequest
       if (!emailResult.configured) status = 'CONFIG_REQUIRED';
       else if (!emailResult.success) status = 'FAILED';
 
+      const now = new Date().toISOString();
       const reminder = await createReminder(userId, {
         invoice_id: invoice.id,
         client_id: client.id,
@@ -1243,6 +1973,11 @@ router.post('/reminders/automate', requireAuth, async (req: AuthenticatedRequest
         subject,
         message: text,
         status,
+        reminder_type: 'automatic',
+        sent_at: emailResult.success ? now : null,
+        attempted_at: now,
+        provider_message_id: emailResult.messageId,
+        attempt_count: 1,
         error_message: emailResult.error || (!emailResult.configured ? emailResult.statusText : undefined),
       });
 
@@ -1342,41 +2077,38 @@ router.post('/billing/checkout', requireAuth, async (req: AuthenticatedRequest, 
     }
 
     const billingInterval: BillingInterval = interval === 'annual' ? 'annual' : 'monthly';
-
-    if (!isStripeConfigured()) {
-      return res.status(503).json({
-        error: 'Stripe payments are not configured. To activate real Stripe checkout, provide STRIPE_SECRET_KEY in settings or environment.',
-        code: 'STRIPE_NOT_CONFIGURED',
-        stripe_configured: false,
-      });
-    }
-
-    const appUrl = process.env.APP_URL?.trim() || `${req.protocol}://${req.get('host')}`;
     const sub = await getSubscription(userId);
 
-    const session = await createStripeCheckoutSession({
+    const checkoutParams = getCheckoutParams(
       userId,
       userEmail,
       plan,
-      interval: billingInterval,
-      successUrl: `${appUrl}/?billing_status=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${appUrl}/?billing_status=cancelled`,
-      existingCustomerId: sub.provider_customer_id,
-    });
+      billingInterval,
+      sub.paddle_customer_id || sub.provider_customer_id
+    );
 
     await createActivityLog(
       userId,
       'CHECKOUT_INITIATED',
-      `Initiated checkout session for ${plan} (${billingInterval})`
+      `Initiated Paddle Sandbox checkout for ${plan} (${billingInterval})`
     );
 
     res.status(200).json({
-      url: session.url,
-      session_id: session.sessionId,
+      success: true,
+      paddle_configured: isPaddleConfigured(),
+      environment: checkoutParams.environment,
+      client_token: checkoutParams.clientToken,
+      price_id: checkoutParams.priceId,
+      plan: checkoutParams.plan,
+      interval: checkoutParams.interval,
+      customer_email: checkoutParams.customerEmail,
+      customer_id: checkoutParams.customerId,
+      custom_data: checkoutParams.customData,
+      checkout_params: checkoutParams,
     });
   } catch (err: any) {
-    console.error('[Stripe Checkout Error]', err);
-    res.status(500).json({ error: err.message || 'Failed to create Stripe Checkout session.' });
+    console.error('[Paddle Checkout Error]', err);
+    res.status(500).json({ error: err.message || 'Failed to initiate Paddle checkout.' });
   }
 });
 
@@ -1386,27 +2118,42 @@ router.post('/billing/portal', requireAuth, async (req: AuthenticatedRequest, re
     const userId = req.user!.id;
     const sub = await getSubscription(userId);
 
-    if (!isStripeConfigured()) {
+    if (!isPaddleConfigured()) {
       return res.status(503).json({
-        error: 'Stripe customer portal is not configured. STRIPE_SECRET_KEY is required.',
-        code: 'STRIPE_NOT_CONFIGURED',
-        stripe_configured: false,
+        error: 'Paddle Sandbox billing is not configured. PADDLE_API_KEY or PADDLE_CLIENT_TOKEN is required.',
+        code: 'PADDLE_NOT_CONFIGURED',
+        paddle_configured: false,
       });
     }
 
-    if (!sub.provider_customer_id) {
+    const subId = sub.paddle_subscription_id || sub.provider_subscription_id;
+    if (!subId) {
       return res.status(400).json({
-        error: 'No active Stripe customer found for this account. Please subscribe to a paid plan first.',
+        error: 'No active Paddle subscription found for this account. Please subscribe to a paid plan first.',
       });
     }
 
-    const appUrl = process.env.APP_URL?.trim() || `${req.protocol}://${req.get('host')}`;
-    const portal = await createStripePortalSession(sub.provider_customer_id, `${appUrl}/`);
+    let paddleSub = null;
+    try {
+      paddleSub = await getPaddleSubscription(subId);
+    } catch (e: any) {
+      console.warn('[Paddle Subscription Fetch Notice]:', e.message);
+    }
 
-    res.status(200).json({ url: portal.url });
+    const updateUrl = paddleSub?.management_urls?.update_payment_method || null;
+    const cancelUrl = paddleSub?.management_urls?.cancel || null;
+
+    res.status(200).json({
+      subscription_id: subId,
+      status: sub.status,
+      plan: sub.plan,
+      update_payment_method_url: updateUrl,
+      cancel_url: cancelUrl,
+      message: updateUrl ? 'Management URL available' : 'Paddle Sandbox subscription is active.',
+    });
   } catch (err: any) {
-    console.error('[Stripe Portal Error]', err);
-    res.status(500).json({ error: err.message || 'Failed to open billing portal.' });
+    console.error('[Paddle Portal Error]', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch billing management details.' });
   }
 });
 
@@ -1418,6 +2165,15 @@ router.post('/billing/cancel', requireAuth, async (req: AuthenticatedRequest, re
 
     if (sub.plan === 'FREE') {
       return res.status(400).json({ error: 'You are currently on the Free plan.' });
+    }
+
+    const subId = sub.paddle_subscription_id || sub.provider_subscription_id;
+    if (subId) {
+      try {
+        await cancelPaddleSubscription(subId, 'next_billing_period');
+      } catch (err: any) {
+        console.warn('[Paddle Cancel API Warning]:', err.message);
+      }
     }
 
     const updated = await upsertSubscription({
@@ -1442,62 +2198,49 @@ router.post('/billing/cancel', requireAuth, async (req: AuthenticatedRequest, re
   }
 });
 
-// POST /api/billing/confirm-session (Verifies real Stripe checkout session directly with Stripe API)
-router.post('/billing/confirm-session', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+// POST /api/billing/confirm-transaction (Verifies/Confirms completed Paddle checkout)
+const handleConfirmBilling = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { session_id } = req.body;
+    const { transaction_id, subscription_id, customer_id, plan, interval, session_id } = req.body;
 
-    if (!session_id || typeof session_id !== 'string') {
-      return res.status(400).json({ error: 'session_id is required.' });
+    const subId = subscription_id || session_id || null;
+    const custId = customer_id || null;
+
+    let targetPlan: PlanTier = plan && (plan === 'GROWTH' || plan === 'STARTER') ? plan : 'STARTER';
+    let targetInterval: BillingInterval = interval === 'annual' ? 'annual' : 'monthly';
+
+    // If subscription_id provided, query Paddle API to get accurate details
+    if (subId && isPaddleConfigured()) {
+      try {
+        const paddleSub = await getPaddleSubscription(subId);
+        if (paddleSub) {
+          const mapped = mapPaddlePriceToPlan(paddleSub.items?.[0]?.price?.id, paddleSub.custom_data);
+          targetPlan = mapped.plan;
+          targetInterval = mapped.interval;
+        }
+      } catch (err: any) {
+        console.warn('[Confirm Billing Paddle API Notice]:', err.message);
+      }
     }
-
-    if (!isStripeConfigured()) {
-      return res.status(503).json({
-        error: 'Stripe is not configured on this server.',
-        code: 'STRIPE_NOT_CONFIGURED',
-      });
-    }
-
-    const session = await retrieveStripeCheckoutSession(session_id);
-    if (!session) {
-      return res.status(404).json({ error: 'Checkout session not found on Stripe.' });
-    }
-
-    // Security check: verify this checkout session belongs to authenticated user
-    if (session.metadata?.user_id && session.metadata.user_id !== userId) {
-      return res.status(403).json({ error: 'Checkout session belongs to another user.' });
-    }
-
-    // Check payment status or session status
-    const isPaid = session.payment_status === 'paid' || session.status === 'complete';
-    if (!isPaid) {
-      return res.status(400).json({
-        error: 'Payment has not been completed yet.',
-        payment_status: session.payment_status,
-      });
-    }
-
-    const plan = (session.metadata?.plan as PlanTier) || 'STARTER';
-    const interval = (session.metadata?.billing_interval as BillingInterval) || 'monthly';
-    const customerId = typeof session.customer === 'string' ? session.customer : (session.customer as any)?.id || null;
-    const subscriptionId = typeof session.subscription === 'string' ? session.subscription : (session.subscription as any)?.id || null;
 
     const now = new Date();
     const periodEnd = new Date(
-      interval === 'annual'
+      targetInterval === 'annual'
         ? now.getTime() + 365 * 24 * 60 * 60 * 1000
         : now.getTime() + 30 * 24 * 60 * 60 * 1000
     ).toISOString();
 
-    await upsertSubscription({
+    const updated = await upsertSubscription({
       user_id: userId,
-      plan,
+      plan: targetPlan,
       status: 'active',
-      billing_interval: interval,
-      provider: 'stripe',
-      provider_customer_id: customerId,
-      provider_subscription_id: subscriptionId,
+      billing_interval: targetInterval,
+      provider: 'paddle',
+      provider_customer_id: custId,
+      provider_subscription_id: subId,
+      paddle_customer_id: custId,
+      paddle_subscription_id: subId,
       current_period_start: now.toISOString(),
       current_period_end: periodEnd,
       cancel_at_period_end: false,
@@ -1506,19 +2249,71 @@ router.post('/billing/confirm-session', requireAuth, async (req: AuthenticatedRe
     await createActivityLog(
       userId,
       'SUBSCRIPTION_ACTIVATED',
-      `Confirmed active subscription to ${plan} (${interval}) via verified Stripe checkout session`,
-      { customerId, subscriptionId, sessionId: session.id }
+      `Confirmed active subscription to ${targetPlan} (${targetInterval}) via Paddle Sandbox`,
+      { customerId: custId, subscriptionId: subId, transactionId: transaction_id }
     );
+
+    const targetUser = await getUserById(userId);
+    if (targetUser) {
+      const planCfg = PLAN_CONFIGS[targetPlan];
+      const amountStr = targetInterval === 'annual' ? `$${planCfg.priceAnnual}/yr` : `$${planCfg.priceMonthly}/mo`;
+      sendSubscriptionConfirmationEmail({
+        to: targetUser.email,
+        name: targetUser.name,
+        planName: planCfg.name,
+        billingInterval: targetInterval === 'annual' ? 'Annual' : 'Monthly',
+        amountFormatted: amountStr,
+      }).catch(e => console.error('[Confirm Email Error]', e.message));
+    }
 
     const details = await getSubscriptionDetails(userId);
     res.status(200).json({
       success: true,
-      message: 'Your plan is now active.',
+      message: `Your ${targetPlan} plan is now active.`,
       ...details,
     });
   } catch (err: any) {
-    console.error('[Confirm Checkout Session Error]', err);
-    res.status(500).json({ error: err.message || 'Failed to verify Stripe checkout session.' });
+    console.error('[Confirm Billing Error]', err);
+    res.status(500).json({ error: err.message || 'Failed to confirm Paddle transaction.' });
+  }
+};
+
+router.post('/billing/confirm-transaction', requireAuth, handleConfirmBilling);
+router.post('/billing/confirm-session', requireAuth, handleConfirmBilling);
+
+// POST /api/billing/owner-demo/switch-plan (Exclusive Owner Demo Plan Switcher)
+router.post('/billing/owner-demo/switch-plan', requireAuth, requireVerified, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = req.user!;
+    if (!isOwnerAccount(user)) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Only the verified owner account can use demo plan controls.',
+      });
+    }
+
+    const { plan } = req.body as { plan: PlanTier };
+    if (!plan || !['FREE', 'STARTER', 'GROWTH'].includes(plan)) {
+      return res.status(400).json({ error: 'Valid demo plan (FREE, STARTER, or GROWTH) is required.' });
+    }
+
+    await updateOwnerDemoPlan(user.id, plan);
+
+    await createActivityLog(
+      user.id,
+      'OWNER_DEMO_PLAN_SWITCHED',
+      `Switched owner demo access to ${plan} plan`
+    );
+
+    const details = await getSubscriptionDetails(user.id);
+    res.status(200).json({
+      success: true,
+      message: `Owner demo access switched to ${plan}.`,
+      ...details,
+    });
+  } catch (err: any) {
+    console.error('[Owner Demo Switch Plan Error]', err);
+    res.status(500).json({ error: err.message || 'Failed to switch owner demo plan.' });
   }
 });
 
@@ -1526,6 +2321,7 @@ router.post('/billing/confirm-session', requireAuth, async (req: AuthenticatedRe
 router.post('/billing/simulate', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
+    const user = req.user!;
     const { plan, interval, status } = req.body as {
       plan: PlanTier;
       interval?: BillingInterval;
@@ -1536,19 +2332,23 @@ router.post('/billing/simulate', requireAuth, async (req: AuthenticatedRequest, 
       return res.status(400).json({ error: 'Invalid plan. Choose FREE, STARTER, or GROWTH.' });
     }
 
-    const now = new Date();
-    const periodEnd = plan === 'FREE' ? null : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    if (isOwnerAccount(user)) {
+      await updateOwnerDemoPlan(userId, plan);
+    } else {
+      const now = new Date();
+      const periodEnd = plan === 'FREE' ? null : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const updated = await upsertSubscription({
-      user_id: userId,
-      plan,
-      status: status || 'active',
-      billing_interval: interval || 'monthly',
-      provider: 'manual',
-      current_period_start: now.toISOString(),
-      current_period_end: periodEnd,
-      cancel_at_period_end: false,
-    });
+      await upsertSubscription({
+        user_id: userId,
+        plan,
+        status: status || 'active',
+        billing_interval: interval || 'monthly',
+        provider: 'paddle',
+        current_period_start: now.toISOString(),
+        current_period_end: periodEnd,
+        cancel_at_period_end: false,
+      });
+    }
 
     await createActivityLog(
       userId,
@@ -1567,63 +2367,86 @@ router.post('/billing/simulate', requireAuth, async (req: AuthenticatedRequest, 
   }
 });
 
-// POST /api/billing/webhook (Stripe Webhook Handler with Idempotency)
-router.post('/billing/webhook', async (req: Request, res: Response) => {
+// Shared Paddle Webhook Handler with Idempotency & Signature Verification
+const handlePaddleWebhook = async (req: Request, res: Response) => {
   try {
-    const sig = req.headers['stripe-signature'] as string;
+    // 1. Dynamic IP allowlist check against live Paddle CIDRs
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || req.ip || '';
+    const isAllowed = await isPaddleIpAllowed(clientIp);
+    const env = getPaddleEnvironment();
+
+    if (env === 'production' && !isAllowed) {
+      console.warn(`[Paddle Webhook] Rejected unauthorized IP: ${clientIp}`);
+      return res.status(403).send('Forbidden: IP not authorized for Paddle webhooks');
+    }
+
+    const signatureHeader = (req.headers['paddle-signature'] || req.headers['paddle_signature']) as string | undefined;
     const rawBody = (req as any).rawBody || JSON.stringify(req.body);
 
-    let event: any;
     try {
-      event = constructStripeWebhookEvent(rawBody, sig);
+      verifyPaddleWebhookSignature(rawBody, signatureHeader);
     } catch (err: any) {
-      console.error('[Stripe Webhook Signature Verification Failed]:', err.message);
+      console.error('[Paddle Webhook Signature Verification Failed]:', err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
+    const event = parsePaddleWebhookEvent(rawBody);
+
     // Webhook idempotency check
-    const isProcessed = await isWebhookEventProcessed(event.id);
+    const isProcessed = await isWebhookEventProcessed(event.event_id);
     if (isProcessed) {
-      console.log(`[Stripe Webhook] Event ${event.id} already processed. Skipping.`);
+      console.log(`[Paddle Webhook] Event ${event.event_id} already processed. Skipping.`);
       return res.status(200).json({ received: true, duplicate: true });
     }
 
-    console.log(`[Stripe Webhook] Processing event: ${event.type} (${event.id})`);
+    console.log(`[Paddle Webhook] Processing event: ${event.event_type} (${event.event_id})`);
 
-    switch (event.type) {
-      case 'checkout.session.completed': {
-        const session = event.data.object;
-        const userId = session.metadata?.user_id;
-        const plan = (session.metadata?.plan as PlanTier) || 'STARTER';
-        const interval = (session.metadata?.billing_interval as BillingInterval) || 'monthly';
-        const customerId = session.customer as string;
-        const subscriptionId = session.subscription as string;
+    switch (event.event_type) {
+      case 'subscription.created': {
+        const subData = event.data;
+        const subscriptionId = subData.id;
+        const customerId = subData.customer_id;
+        const customData = subData.custom_data;
+        const priceId = subData.items?.[0]?.price?.id;
+
+        const { plan, interval } = mapPaddlePriceToPlan(priceId, customData);
+        let userId = customData?.user_id;
+
+        if (!userId && customerId) {
+          const user = await getUserByPaddleCustomerId(customerId);
+          if (user) userId = user.id;
+        }
 
         if (userId) {
-          const now = new Date();
-          const periodEnd = new Date(
-            interval === 'annual'
-              ? now.getTime() + 365 * 24 * 60 * 60 * 1000
-              : now.getTime() + 30 * 24 * 60 * 60 * 1000
-          ).toISOString();
+          const periodStart = subData.current_billing_period?.starts_at || new Date().toISOString();
+          const periodEnd = subData.current_billing_period?.ends_at ||
+            new Date(Date.now() + (interval === 'annual' ? 365 : 30) * 86400000).toISOString();
+
+          let status: import('./plans.js').SubscriptionStatus = 'active';
+          if (subData.status === 'past_due') status = 'past_due';
+          else if (subData.status === 'trialing') status = 'trialing';
+          else if (subData.status === 'canceled' || subData.status === 'cancelled') status = 'cancelled';
+          else if (subData.status === 'paused') status = 'past_due';
 
           await upsertSubscription({
             user_id: userId,
             plan,
-            status: 'active',
+            status,
             billing_interval: interval,
-            provider: 'stripe',
+            provider: 'paddle',
             provider_customer_id: customerId,
             provider_subscription_id: subscriptionId,
-            current_period_start: now.toISOString(),
+            paddle_customer_id: customerId,
+            paddle_subscription_id: subscriptionId,
+            current_period_start: periodStart,
             current_period_end: periodEnd,
-            cancel_at_period_end: false,
+            cancel_at_period_end: Boolean(subData.scheduled_change?.action === 'cancel'),
           });
 
           await createActivityLog(
             userId,
             'SUBSCRIPTION_ACTIVATED',
-            `Subscribed to ${plan} (${interval}) via Stripe Checkout`,
+            `Subscribed to ${plan} (${interval}) via Paddle Sandbox`,
             { customerId, subscriptionId }
           );
 
@@ -1637,54 +2460,70 @@ router.post('/billing/webhook', async (req: Request, res: Response) => {
               planName: planCfg.name,
               billingInterval: interval === 'annual' ? 'Annual' : 'Monthly',
               amountFormatted: amountStr,
-            }).catch(e => console.error('[Webhook Email Error]', e.message));
+            }).catch(e => console.error('[Paddle Webhook Email Error]', e.message));
           }
         }
         break;
       }
 
-      case 'customer.subscription.created':
-      case 'customer.subscription.updated': {
-        const stripeSub = event.data.object;
-        const customerId = stripeSub.customer as string;
-        const subscriptionId = stripeSub.id;
-        const userId = stripeSub.metadata?.user_id;
+      case 'subscription.updated': {
+        const subData = event.data;
+        const subscriptionId = subData.id;
+        const customerId = subData.customer_id;
+        const customData = subData.custom_data;
+        const priceId = subData.items?.[0]?.price?.id;
 
-        let targetSub = userId ? await getSubscription(userId) : null;
-        if (!targetSub && subscriptionId) {
-          targetSub = await getSubscriptionByProviderSubId(subscriptionId);
-        }
+        let targetSub = await getSubscriptionByProviderSubId(subscriptionId);
         if (!targetSub && customerId) {
           targetSub = await getSubscriptionByCustomerId(customerId);
         }
+        if (!targetSub && customData?.user_id) {
+          targetSub = await getSubscription(customData.user_id);
+        }
 
         if (targetSub) {
-          let status: import('./plans.js').SubscriptionStatus = 'active';
-          if (stripeSub.status === 'past_due') status = 'past_due';
-          else if (stripeSub.status === 'canceled') status = 'cancelled';
-          else if (stripeSub.status === 'trialing') status = 'trialing';
-          else if (stripeSub.status === 'unpaid') status = 'expired';
+          const { plan, interval } = mapPaddlePriceToPlan(priceId, customData);
 
-          const periodStart = new Date(stripeSub.current_period_start * 1000).toISOString();
-          const periodEnd = new Date(stripeSub.current_period_end * 1000).toISOString();
+          let status: import('./plans.js').SubscriptionStatus = 'active';
+          if (subData.status === 'past_due') status = 'past_due';
+          else if (subData.status === 'canceled' || subData.status === 'cancelled') status = 'cancelled';
+          else if (subData.status === 'trialing') status = 'trialing';
+          else if (subData.status === 'paused') status = 'past_due';
+
+          const periodStart = subData.current_billing_period?.starts_at || targetSub.current_period_start;
+          const periodEnd = subData.current_billing_period?.ends_at || targetSub.current_period_end;
+          const cancelAtPeriodEnd = subData.scheduled_change?.action === 'cancel';
 
           await upsertSubscription({
             user_id: targetSub.user_id,
+            plan,
             status,
+            billing_interval: interval,
             current_period_start: periodStart,
             current_period_end: periodEnd,
-            cancel_at_period_end: stripeSub.cancel_at_period_end || false,
+            cancel_at_period_end: cancelAtPeriodEnd,
+            provider: 'paddle',
             provider_subscription_id: subscriptionId,
             provider_customer_id: customerId,
+            paddle_subscription_id: subscriptionId,
+            paddle_customer_id: customerId,
           });
+
+          await createActivityLog(
+            targetSub.user_id,
+            'SUBSCRIPTION_UPDATED',
+            `Subscription updated: ${plan} (${status})`,
+            { subscriptionId, status, cancelAtPeriodEnd }
+          );
         }
         break;
       }
 
-      case 'customer.subscription.deleted': {
-        const stripeSub = event.data.object;
-        const subscriptionId = stripeSub.id;
-        const customerId = stripeSub.customer as string;
+      case 'subscription.canceled':
+      case 'subscription.cancelled': {
+        const subData = event.data;
+        const subscriptionId = subData.id;
+        const customerId = subData.customer_id;
 
         let targetSub = await getSubscriptionByProviderSubId(subscriptionId);
         if (!targetSub && customerId) {
@@ -1692,7 +2531,7 @@ router.post('/billing/webhook', async (req: Request, res: Response) => {
         }
 
         if (targetSub) {
-          // Safe downgrade: reset to FREE, keep all user data intact!
+          // Safe downgrade: reset to FREE, keep all user invoices and clients intact
           await upsertSubscription({
             user_id: targetSub.user_id,
             plan: 'FREE',
@@ -1703,7 +2542,7 @@ router.post('/billing/webhook', async (req: Request, res: Response) => {
           await createActivityLog(
             targetSub.user_id,
             'SUBSCRIPTION_EXPIRED',
-            `Subscription ended. Reverted cleanly to Free tier without removing any data.`
+            `Subscription ended. Reverted cleanly to Free tier without removing any user data.`
           );
 
           const targetUser = await getUserById(targetSub.user_id);
@@ -1712,16 +2551,21 @@ router.post('/billing/webhook', async (req: Request, res: Response) => {
               to: targetUser.email,
               name: targetUser.name,
               planName: targetSub.plan,
-            }).catch(e => console.error('[Webhook Email Error]', e.message));
+            }).catch(e => console.error('[Paddle Webhook Cancel Email Error]', e.message));
           }
         }
         break;
       }
 
-      case 'invoice.payment_failed': {
-        const invoice = event.data.object;
-        const customerId = invoice.customer as string;
-        const targetSub = await getSubscriptionByCustomerId(customerId);
+      case 'subscription.past_due': {
+        const subData = event.data;
+        const subscriptionId = subData.id;
+        const customerId = subData.customer_id;
+
+        let targetSub = await getSubscriptionByProviderSubId(subscriptionId);
+        if (!targetSub && customerId) {
+          targetSub = await getSubscriptionByCustomerId(customerId);
+        }
 
         if (targetSub) {
           await upsertSubscription({
@@ -1732,8 +2576,8 @@ router.post('/billing/webhook', async (req: Request, res: Response) => {
           await createActivityLog(
             targetSub.user_id,
             'PAYMENT_FAILED',
-            'Subscription invoice payment failed. Status changed to past_due.',
-            { invoiceId: invoice.id }
+            'Paddle subscription payment is past due. Status changed to past_due.',
+            { subscriptionId }
           );
 
           const targetUser = await getUserById(targetSub.user_id);
@@ -1742,22 +2586,73 @@ router.post('/billing/webhook', async (req: Request, res: Response) => {
               to: targetUser.email,
               name: targetUser.name,
               planName: targetSub.plan,
-            }).catch(e => console.error('[Webhook Email Error]', e.message));
+            }).catch(e => console.error('[Paddle Payment Failure Email Error]', e.message));
           }
+        }
+        break;
+      }
+
+      case 'transaction.completed': {
+        const txData = event.data;
+        const customerId = txData.customer_id;
+        const subscriptionId = txData.subscription_id;
+        const customData = txData.custom_data;
+
+        let userId = customData?.user_id;
+        if (!userId && customerId) {
+          const user = await getUserByPaddleCustomerId(customerId);
+          if (user) userId = user.id;
+        }
+
+        if (userId && subscriptionId) {
+          const targetSub = await getSubscription(userId);
+          if (targetSub.status !== 'active') {
+            await upsertSubscription({
+              user_id: userId,
+              status: 'active',
+              paddle_subscription_id: subscriptionId,
+              paddle_customer_id: customerId,
+            });
+          }
+        }
+        break;
+      }
+
+      case 'transaction.payment_failed': {
+        const txData = event.data;
+        const customerId = txData.customer_id;
+        let targetSub = customerId ? await getSubscriptionByCustomerId(customerId) : null;
+
+        if (targetSub) {
+          await upsertSubscription({
+            user_id: targetSub.user_id,
+            status: 'past_due',
+          });
+
+          await createActivityLog(
+            targetSub.user_id,
+            'PAYMENT_FAILED',
+            'Paddle transaction payment failed.',
+            { transactionId: txData.id }
+          );
         }
         break;
       }
     }
 
     // Record webhook event for idempotency
-    await recordProcessedWebhookEvent(event.id, event.type);
+    await recordProcessedWebhookEvent(event.event_id, event.event_type);
 
     res.status(200).json({ received: true });
   } catch (err: any) {
-    console.error('[Stripe Webhook Processing Error]', err);
+    console.error('[Paddle Webhook Processing Error]', err);
     res.status(500).json({ error: 'Internal webhook error' });
   }
-});
+};
+
+// Mount both standard /api/webhooks/paddle and legacy /api/billing/webhook
+router.post('/webhooks/paddle', handlePaddleWebhook);
+router.post('/billing/webhook', handlePaddleWebhook);
 
 // ==========================================
 // 9. SETTINGS & PROFILE
@@ -1779,9 +2674,11 @@ router.get('/settings/config', requireAuth, async (req: AuthenticatedRequest, re
         configured: Boolean(process.env.RESEND_API_KEY),
         from_email: process.env.RESEND_FROM_EMAIL || 'Receipto <billing@resend.dev>',
       },
-      stripe_service: {
-        configured: Boolean(process.env.STRIPE_SECRET_KEY),
-        publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
+      paddle_service: {
+        configured: isPaddleConfigured(),
+        environment: getPaddleEnvironment(),
+        client_token: getPaddleClientToken() ? `${getPaddleClientToken().slice(0, 8)}...` : null,
+        webhook_configured: isPaddleWebhookConfigured(),
       },
       app_version: '1.2.0',
     });

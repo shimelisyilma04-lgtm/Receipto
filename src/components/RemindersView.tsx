@@ -242,7 +242,7 @@ export function RemindersView({
                 </div>
 
                 <div className="text-xs text-slate-400 whitespace-nowrap">
-                  {new Date(rem.sent_at).toLocaleString()}
+                  {rem.sent_at ? new Date(rem.sent_at).toLocaleString() : rem.created_at ? new Date(rem.created_at).toLocaleString() : 'Pending'}
                 </div>
               </div>
             ))}

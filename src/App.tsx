@@ -23,6 +23,7 @@ import { AuthScreen } from './components/AuthScreen.js';
 import { EmailVerificationView } from './components/EmailVerificationView.js';
 import { LandingPage } from './components/LandingPage.js';
 import { TermsModal } from './components/TermsModal.js';
+import { LegalPages, type LegalTab } from './components/LegalPages.js';
 import { ReceiptoLogo } from './components/ReceiptoLogo.js';
 import { ContactSupportModal } from './components/ContactSupportModal.js';
 import { ToastContainer, type ToastMessage } from './components/Toast.js';
@@ -35,11 +36,21 @@ interface UnverifiedState {
   message?: string;
 }
 
+function getLegalRouteFromPath(): LegalTab | null {
+  if (typeof window === 'undefined') return null;
+  const path = window.location.pathname.toLowerCase();
+  if (path === '/terms' || path === '/terms-of-service') return 'terms';
+  if (path === '/privacy' || path === '/privacy-policy') return 'privacy';
+  if (path === '/refund-policy' || path === '/refund' || path === '/cancellation-policy') return 'refund';
+  return null;
+}
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [unverifiedState, setUnverifiedState] = useState<UnverifiedState | null>(null);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register' | null>(null);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
+  const [legalRoute, setLegalRoute] = useState<LegalTab | null>(getLegalRouteFromPath);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [currentTab, setCurrentTab] = useState<TabType>('dashboard');
@@ -50,6 +61,7 @@ export default function App() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [subscriptionDetails, setSubscriptionDetails] = useState<SubscriptionDetails | null>(null);
   const [loadingData, setLoadingData] = useState(false);
+  const [dataLoadError, setDataLoadError] = useState<string | null>(null);
 
   // Modals States
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
@@ -77,7 +89,7 @@ export default function App() {
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  function showToast(message: string, type: 'success' | 'error' | 'info' = 'info') {
+  function showToast(message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') {
     const id = `${Date.now()}-${Math.random()}`;
     setToasts((prev) => [...prev, { id, type, message }]);
     setTimeout(() => {
@@ -92,6 +104,15 @@ export default function App() {
   // Check auth on load
   useEffect(() => {
     checkAuth();
+  }, []);
+
+  // Listen to browser forward/back buttons for legal pages
+  useEffect(() => {
+    const handlePopState = () => {
+      setLegalRoute(getLegalRouteFromPath());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   async function checkAuth() {
@@ -128,20 +149,46 @@ export default function App() {
   async function loadAllData() {
     try {
       setLoadingData(true);
-      const [dashRes, clientsRes, invoicesRes, subRes] = await Promise.all([
+      setDataLoadError(null);
+      const [dashRes, clientsRes, invoicesRes, subRes] = await Promise.allSettled([
         api.getDashboard(),
         api.getClients(),
         api.getInvoices(),
-        api.getSubscription().catch(() => null),
+        api.getSubscription(),
       ]);
-      setStats(dashRes.stats);
-      setClients(clientsRes.clients);
-      setInvoices(invoicesRes.invoices);
-      if (subRes) {
-        setSubscriptionDetails(subRes);
+
+      let criticalError: string | null = null;
+
+      if (dashRes.status === 'fulfilled') {
+        setStats(dashRes.value.stats);
+      } else {
+        console.warn('Dashboard stats failed to load:', dashRes.reason);
+      }
+
+      if (clientsRes.status === 'fulfilled') {
+        setClients(clientsRes.value.clients);
+      } else {
+        console.warn('Clients failed to load:', clientsRes.reason);
+        criticalError = clientsRes.reason?.message || 'Failed to load client records.';
+      }
+
+      if (invoicesRes.status === 'fulfilled') {
+        setInvoices(invoicesRes.value.invoices);
+      } else {
+        console.error('Invoices failed to load:', invoicesRes.reason);
+        criticalError = invoicesRes.reason?.message || 'Failed to retrieve invoice records.';
+      }
+
+      if (subRes.status === 'fulfilled' && subRes.value) {
+        setSubscriptionDetails(subRes.value);
+      }
+
+      if (criticalError) {
+        setDataLoadError(criticalError);
       }
     } catch (err: any) {
       console.error('Failed to load data:', err);
+      setDataLoadError(err.message || 'Failed to retrieve invoice records.');
     } finally {
       setLoadingData(false);
     }
@@ -174,7 +221,7 @@ export default function App() {
       loadAllData();
     } catch (err: any) {
       const msg = err.message || '';
-      if (msg.includes('limit reached') || msg.includes('Upgrade to') || err.upgrade_required) {
+      if (msg.includes('limit reached') || msg.includes('Upgrade to') || err.upgrade_required || err.code === 'PLAN_LIMIT_REACHED' || err.error === 'PLAN_LIMIT_REACHED') {
         setIsClientModalOpen(false);
         setUpgradePrompt({
           isOpen: true,
@@ -216,7 +263,7 @@ export default function App() {
       loadAllData();
     } catch (err: any) {
       const msg = err.message || '';
-      if (msg.includes('limit reached') || msg.includes('Upgrade to') || err.upgrade_required) {
+      if (msg.includes('limit reached') || msg.includes('Upgrade to') || err.upgrade_required || err.code === 'PLAN_LIMIT_REACHED' || err.error === 'PLAN_LIMIT_REACHED') {
         setIsInvoiceModalOpen(false);
         setUpgradePrompt({
           isOpen: true,
@@ -260,6 +307,18 @@ export default function App() {
     } catch (err: any) {
       showToast(err.message || 'Failed to delete invoice.', 'error');
     }
+  }
+
+  if (legalRoute) {
+    return (
+      <LegalPages
+        initialTab={legalRoute}
+        onBackToHome={() => {
+          window.history.pushState({}, '', '/');
+          setLegalRoute(null);
+        }}
+      />
+    );
   }
 
   if (authLoading) {
@@ -333,12 +392,20 @@ export default function App() {
           onGoToDashboard={() => {}}
           onOpenTerms={() => setIsTermsOpen(true)}
           onOpenSupport={() => setIsSupportModalOpen(true)}
+          onNavigateLegal={(tab) => {
+            const path = tab === 'terms' ? '/terms' : tab === 'privacy' ? '/privacy' : '/refund-policy';
+            window.history.pushState({}, '', path);
+            setLegalRoute(tab);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
         />
-        <TermsModal isOpen={isTermsOpen} onClose={() => setIsTermsOpen(false)} />
-        <ContactSupportModal
-          isOpen={isSupportModalOpen}
-          onClose={() => setIsSupportModalOpen(false)}
-        />
+        {isTermsOpen && <TermsModal isOpen={isTermsOpen} onClose={() => setIsTermsOpen(false)} />}
+        {isSupportModalOpen && (
+          <ContactSupportModal
+            isOpen={isSupportModalOpen}
+            onClose={() => setIsSupportModalOpen(false)}
+          />
+        )}
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       </>
     );
@@ -381,6 +448,7 @@ export default function App() {
             invoices={invoices}
             clients={clients}
             loading={loadingData}
+            error={dataLoadError}
             onRefresh={loadAllData}
             onOpenCreateInvoice={() => {
               setEditingInvoice(null);
@@ -396,6 +464,7 @@ export default function App() {
             onCancelInvoice={handleCancelInvoice}
             onDeleteInvoice={handleDeleteInvoice}
             plan={subscriptionDetails?.subscription?.plan}
+            onShowToast={showToast}
             onPromptUpgrade={(title, message, feature) =>
               setUpgradePrompt({ isOpen: true, title, message, featureOrLimit: feature })
             }
@@ -467,65 +536,77 @@ export default function App() {
       </main>
 
       {/* Invoice Create / Edit Modal */}
-      <InvoiceModal
-        isOpen={isInvoiceModalOpen}
-        onClose={() => setIsInvoiceModalOpen(false)}
-        onSubmit={handleSaveInvoice}
-        clients={clients}
-        initialInvoice={editingInvoice}
-        onOpenCreateClient={() => {
-          setIsInvoiceModalOpen(false);
-          setEditingClient(null);
-          setIsClientModalOpen(true);
-        }}
-      />
+      {isInvoiceModalOpen && (
+        <InvoiceModal
+          isOpen={isInvoiceModalOpen}
+          onClose={() => setIsInvoiceModalOpen(false)}
+          onSubmit={handleSaveInvoice}
+          clients={clients}
+          initialInvoice={editingInvoice}
+          onOpenCreateClient={() => {
+            setIsInvoiceModalOpen(false);
+            setEditingClient(null);
+            setIsClientModalOpen(true);
+          }}
+        />
+      )}
 
       {/* Client Create / Edit Modal */}
-      <ClientModal
-        isOpen={isClientModalOpen}
-        onClose={() => setIsClientModalOpen(false)}
-        onSubmit={handleSaveClient}
-        initialClient={editingClient}
-      />
+      {isClientModalOpen && (
+        <ClientModal
+          isOpen={isClientModalOpen}
+          onClose={() => setIsClientModalOpen(false)}
+          onSubmit={handleSaveClient}
+          initialClient={editingClient}
+        />
+      )}
 
       {/* Printable Invoice Modal */}
-      <PrintInvoiceModal
-        invoice={printingInvoice}
-        currentUser={currentUser}
-        onClose={() => setPrintingInvoice(null)}
-      />
+      {printingInvoice && (
+        <PrintInvoiceModal
+          invoice={printingInvoice}
+          currentUser={currentUser}
+          onClose={() => setPrintingInvoice(null)}
+        />
+      )}
 
       {/* Send Payment Reminder Modal */}
-      <SendReminderModal
-        invoice={remindingInvoice}
-        onClose={() => setRemindingInvoice(null)}
-        onSuccess={(msg) => {
-          showToast(msg, 'success');
-          loadAllData();
-        }}
-        onError={(err) => showToast(err, 'error')}
-      />
+      {remindingInvoice && (
+        <SendReminderModal
+          invoice={remindingInvoice}
+          onClose={() => setRemindingInvoice(null)}
+          onSuccess={(msg) => {
+            showToast(msg, 'success');
+            loadAllData();
+          }}
+          onError={(err) => showToast(err, 'error')}
+        />
+      )}
 
       {/* Feature / Limit Upgrade Prompt Modal */}
-      <UpgradePromptModal
-        isOpen={upgradePrompt.isOpen}
-        onClose={() => setUpgradePrompt((prev) => ({ ...prev, isOpen: false }))}
-        title={upgradePrompt.title}
-        message={upgradePrompt.message}
-        featureOrLimit={upgradePrompt.featureOrLimit}
-        currentPlan={subscriptionDetails?.subscription?.plan}
-        onNavigateToBilling={() => {
-          setUpgradePrompt((prev) => ({ ...prev, isOpen: false }));
-          setCurrentTab('billing');
-        }}
-      />
+      {upgradePrompt.isOpen && (
+        <UpgradePromptModal
+          isOpen={upgradePrompt.isOpen}
+          onClose={() => setUpgradePrompt((prev) => ({ ...prev, isOpen: false }))}
+          title={upgradePrompt.title}
+          message={upgradePrompt.message}
+          featureOrLimit={upgradePrompt.featureOrLimit}
+          currentPlan={subscriptionDetails?.subscription?.plan}
+          onNavigateToBilling={() => {
+            setUpgradePrompt((prev) => ({ ...prev, isOpen: false }));
+            setCurrentTab('billing');
+          }}
+        />
+      )}
 
       {/* Support Modal */}
-      <ContactSupportModal
-        isOpen={isSupportModalOpen}
-        onClose={() => setIsSupportModalOpen(false)}
-        userEmail={currentUser?.email}
-      />
+      {isSupportModalOpen && (
+        <ContactSupportModal
+          isOpen={isSupportModalOpen}
+          onClose={() => setIsSupportModalOpen(false)}
+          userEmail={currentUser?.email}
+        />
+      )}
 
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

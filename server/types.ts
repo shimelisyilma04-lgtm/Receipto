@@ -13,6 +13,7 @@ export interface User {
   terms_accepted_at?: string;
   terms_version?: string;
   last_login_at?: string;
+  paddle_customer_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -27,7 +28,7 @@ export interface EmailVerification {
   expires_at: string;
   attempt_count: number;
   used_at: string | null;
-  purpose: 'email_verification';
+  purpose: 'email_verification' | 'password_reset';
   resend_count: number;
   last_resend_at: string;
 }
@@ -72,17 +73,26 @@ export interface Invoice {
   updated_at: string;
 }
 
+export type ReminderType = 'manual' | 'automatic';
+export type ReminderStatus = 'PENDING' | 'SENDING' | 'SENT' | 'FAILED' | 'CANCELLED' | 'CONFIG_REQUIRED';
+
 export interface Reminder {
   id: string;
   user_id: string;
   invoice_id: string;
   client_id: string;
   recipient_email: string;
+  reminder_type?: ReminderType;
+  scheduled_at?: string | null;
+  attempted_at?: string | null;
+  sent_at?: string | null;
+  status: ReminderStatus;
+  provider_message_id?: string | null;
+  attempt_count?: number;
+  error_message?: string | null;
   subject: string;
   message: string;
-  sent_at: string;
-  status: 'SENT' | 'FAILED' | 'CONFIG_REQUIRED';
-  error_message?: string;
+  created_at?: string;
 }
 
 export interface ActivityLog {
@@ -113,7 +123,8 @@ export interface DashboardStats {
 export type PlanTier = 'FREE' | 'STARTER' | 'GROWTH';
 export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'cancelled' | 'expired';
 export type BillingInterval = 'monthly' | 'annual';
-export type SubscriptionProvider = 'stripe' | 'manual';
+export type SubscriptionProvider = 'paddle' | 'manual' | 'demo';
+export type AccessMode = 'paddle' | 'owner_demo' | 'free';
 
 export interface Subscription {
   id: string;
@@ -122,8 +133,11 @@ export interface Subscription {
   status: SubscriptionStatus;
   billing_interval: BillingInterval;
   provider: SubscriptionProvider;
+  access_mode?: AccessMode;
   provider_customer_id: string | null;
   provider_subscription_id: string | null;
+  paddle_customer_id?: string | null;
+  paddle_subscription_id?: string | null;
   current_period_start: string;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
@@ -134,8 +148,10 @@ export interface Subscription {
 export interface SubscriptionUsage {
   client_count: number;
   max_clients: number | null;
+  clients_remaining: number | null;
   invoices_this_period: number;
   max_invoices_per_month: number | null;
+  invoices_remaining: number | null;
   period_start: string;
   period_end: string | null;
   automated_reminders_count: number;
@@ -159,7 +175,7 @@ export interface AdminDashboardStats {
   system_health: {
     database: 'PASS' | 'FAIL';
     email: 'PASS' | 'NOT CONFIGURED' | 'FAIL';
-    stripe: 'PASS' | 'NOT CONFIGURED';
+    paddle: 'PASS' | 'NOT CONFIGURED';
     worker: 'PASS' | 'WARNING' | 'FAIL';
   };
 }
@@ -191,6 +207,8 @@ export interface AdminSubscriptionItem {
   provider: SubscriptionProvider;
   provider_customer_id: string | null;
   provider_subscription_id: string | null;
+  paddle_customer_id?: string | null;
+  paddle_subscription_id?: string | null;
   current_period_start: string;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
@@ -212,11 +230,12 @@ export interface AdminSystemHealth {
     from_email: string;
     details?: string;
   };
-  stripe: {
+  paddle: {
     status: 'PASS' | 'NOT CONFIGURED' | 'FAIL';
     configured: boolean;
     webhook_configured: boolean;
     price_ids_configured: boolean;
+    environment: string;
   };
   application: {
     status: 'PASS';

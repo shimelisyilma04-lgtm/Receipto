@@ -10,7 +10,7 @@ export class ApiError extends Error {
 
 const TOKEN_KEY = 'receipto_auth_token';
 
-function getStoredToken(): string | null {
+export function getStoredToken(): string | null {
   try {
     return localStorage.getItem(TOKEN_KEY);
   } catch {
@@ -30,45 +30,84 @@ export function setStoredToken(token?: string | null) {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const headers = new Headers(options.headers || {});
-  if (!headers.has('Content-Type') && options.body) {
-    headers.set('Content-Type', 'application/json');
-  }
+export interface RequestOptions extends RequestInit {
+  timeout?: number;
+  retries?: number;
+}
 
-  // Fallback token header for cross-origin iframes where 3rd-party cookies may be blocked
-  const token = getStoredToken();
-  if (token && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const method = (options.method || 'GET').toUpperCase();
+  const maxRetries = options.retries ?? (method === 'GET' ? 1 : 0);
+  const timeoutMs = options.timeout ?? 45000;
 
-  const response = await fetch(path, {
-    ...options,
-    headers,
-    credentials: 'include', // sends cookies
-  });
-
-  const text = await response.text();
-  let data: any = {};
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = { error: text };
-  }
-
-  if (!response.ok) {
-    if (response.status === 401 && path !== '/api/auth/login' && path !== '/api/auth/register') {
-      setStoredToken(null);
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const headers = new Headers(options.headers || {});
+    if (!headers.has('Content-Type') && options.body) {
+      headers.set('Content-Type', 'application/json');
     }
-    throw new ApiError(data.error || `Request failed with status ${response.status}`, response.status);
+
+    // Fallback token header for cross-origin iframes where 3rd-party cookies may be blocked
+    const token = getStoredToken();
+    if (token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    if (options.signal) {
+      options.signal.addEventListener('abort', () => controller.abort());
+    }
+
+    try {
+      const response = await fetch(path, {
+        ...options,
+        headers,
+        credentials: 'include', // sends cookies
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      const text = await response.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { error: text };
+      }
+
+      if (!response.ok) {
+        if (response.status === 401 && path !== '/api/auth/login' && path !== '/api/auth/register') {
+          setStoredToken(null);
+        }
+        const errorMsg = data?.error || data?.message || (typeof data === 'string' && data ? data : `Request failed with status ${response.status}`);
+        throw new ApiError(errorMsg, response.status);
+      }
+
+      // If response yielded a token, persist it
+      if (data && typeof data.token === 'string') {
+        setStoredToken(data.token);
+      }
+
+      return data as T;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      const isAbort = err.name === 'AbortError';
+      const isRetryable = attempt < maxRetries && (isAbort || err instanceof TypeError);
+
+      if (isRetryable) {
+        // Wait 500ms before retrying idempotent requests
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+
+      if (isAbort) {
+        throw new ApiError('Request timed out. Please try again.', 408);
+      }
+      throw err;
+    }
   }
 
-  // If response yielded a token, persist it
-  if (data && typeof data.token === 'string') {
-    setStoredToken(data.token);
-  }
-
-  return data as T;
+  throw new ApiError('Request failed after retries.', 500);
 }
 
 export const api = {
@@ -265,27 +304,53 @@ export const api = {
   // Billing & Subscriptions
   getSubscription: () => request<import('./types.js').SubscriptionDetails>('/api/billing/subscription'),
   createCheckoutSession: (plan: 'STARTER' | 'GROWTH', interval: 'monthly' | 'annual') =>
-    request<{ url: string; session_id: string }>('/api/billing/checkout', {
+    request<{
+      success: boolean;
+      paddle_configured: boolean;
+      environment: string;
+      client_token: string;
+      price_id: string;
+      plan: 'STARTER' | 'GROWTH';
+      interval: 'monthly' | 'annual';
+      customer_email?: string;
+      customer_id?: string;
+      custom_data?: any;
+      checkout_params: any;
+    }>('/api/billing/checkout', {
       method: 'POST',
       body: JSON.stringify({ plan, interval }),
     }),
   createCustomerPortalSession: () =>
-    request<{ url: string }>('/api/billing/portal', {
+    request<{
+      subscription_id?: string;
+      status?: string;
+      plan?: string;
+      update_payment_method_url?: string | null;
+      cancel_url?: string | null;
+      message?: string;
+    }>('/api/billing/portal', {
       method: 'POST',
     }),
   cancelSubscription: () =>
     request<{ message: string; subscription: any }>('/api/billing/cancel', {
       method: 'POST',
     }),
-  confirmSession: (session_id: string) =>
-    request<import('./types.js').SubscriptionDetails & { success: boolean; message: string }>('/api/billing/confirm-session', {
+  confirmSession: (data: string | { session_id?: string; transaction_id?: string; subscription_id?: string; customer_id?: string; plan?: string; interval?: string }) => {
+    const body = typeof data === 'string' ? { session_id: data } : data;
+    return request<import('./types.js').SubscriptionDetails & { success: boolean; message: string }>('/api/billing/confirm-transaction', {
       method: 'POST',
-      body: JSON.stringify({ session_id }),
-    }),
+      body: JSON.stringify(body),
+    });
+  },
   simulatePlan: (plan: import('./plans.js').PlanTier, interval?: import('./plans.js').BillingInterval) =>
     request<import('./types.js').SubscriptionDetails & { message: string }>('/api/billing/simulate', {
       method: 'POST',
       body: JSON.stringify({ plan, interval }),
+    }),
+  switchOwnerDemoPlan: (plan: import('./plans.js').PlanTier) =>
+    request<import('./types.js').SubscriptionDetails & { success: boolean; message: string }>('/api/billing/owner-demo/switch-plan', {
+      method: 'POST',
+      body: JSON.stringify({ plan }),
     }),
 
   // Admin Management

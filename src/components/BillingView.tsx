@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   CreditCard,
   CheckCircle2,
@@ -23,6 +23,12 @@ import type { SubscriptionDetails, SubscriptionUsage } from '../types.js';
 import { PLAN_CONFIGS, type PlanTier, type BillingInterval, isPaidSubscriptionActive } from '../plans.js';
 import { api } from '../api.js';
 
+declare global {
+  interface Window {
+    Paddle?: any;
+  }
+}
+
 interface BillingViewProps {
   onShowToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   onSubscriptionUpdated?: () => void;
@@ -40,37 +46,149 @@ export function BillingView({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showSandbox, setShowSandbox] = useState(false);
 
-  // Verification state for returning from Stripe Checkout
+  // Verification state for returning from Paddle Checkout
   const [verificationState, setVerificationState] = useState<{
     status: 'idle' | 'verifying' | 'success' | 'error';
     message?: string;
   }>({ status: 'idle' });
 
+  const paddleInitializedRef = useRef<boolean>(false);
+
+  // Safe structured Paddle diagnostics (checkout.loaded, opened, closed, completed, warning, error)
+  const handlePaddleEvent = useCallback((event: any) => {
+    if (!event?.name) return;
+
+    // Structured development logging (strictly excludes card details, CVV, passwords, tokens, secrets)
+    const isDev = window.location.hostname === 'localhost' || window.location.hostname.includes('run.app');
+    if (isDev) {
+      if (event.name === 'checkout.warning' || event.name === 'checkout.error') {
+        console.warn(`[Paddle Diagnostic ${event.name}]`, {
+          name: event.name,
+          type: event.data?.type || event.type,
+          code: event.data?.code || event.code,
+          detail: event.data?.detail || event.detail,
+          documentation_url: event.data?.documentation_url || event.documentation_url,
+          error_fields: event.data?.fields || event.fields,
+        });
+      } else {
+        console.log(`[Paddle Event: ${event.name}]`, {
+          name: event.name,
+          occurred_at: event.data?.occurred_at || new Date().toISOString(),
+        });
+      }
+    }
+
+    switch (event.name) {
+      case 'checkout.loaded':
+        break;
+      case 'checkout.opened':
+        break;
+      case 'checkout.closed':
+        setActionLoading(null);
+        break;
+      case 'checkout.completed':
+        handleCheckoutCompleted(event.data);
+        break;
+      case 'checkout.warning':
+        break;
+      case 'checkout.error':
+        setActionLoading(null);
+        const detailMsg = event.data?.detail || event.data?.code || 'Paddle checkout encountered an issue.';
+        onShowToast(`Checkout Notice: ${detailMsg}`, 'error');
+        break;
+    }
+  }, []);
+
   useEffect(() => {
     loadSubscription();
 
-    // Check URL parameters for return from Stripe Checkout
+    // Check URL parameters for return from Paddle Checkout
     const params = new URLSearchParams(window.location.search);
     const billingStatus = params.get('billing_status');
-    const sessionId = params.get('session_id');
+    const sessionId = params.get('session_id') || params.get('transaction_id');
 
     if (billingStatus === 'success' && sessionId) {
       verifyCheckoutSession(sessionId);
     } else if (billingStatus === 'success') {
       onShowToast('Payment received! Checking subscription status...', 'info');
-      // Clean query param
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (billingStatus === 'cancelled') {
-      onShowToast('Stripe checkout was cancelled. You can upgrade anytime.', 'info');
+      onShowToast('Paddle checkout was cancelled. You can upgrade anytime.', 'info');
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
+
+  useEffect(() => {
+    if (details && window.Paddle && !paddleInitializedRef.current) {
+      const token = details.paddle_client_token?.trim();
+      const isTokenValid = Boolean(token && (token.startsWith('test_') || token.startsWith('live_')));
+      if (isTokenValid) {
+        try {
+          // Live is the default in Paddle.js v2
+          // For Paddle Retain, supply the customer ID (ctm_...)
+          const customerId = details?.subscription?.paddle_customer_id || details?.subscription?.provider_customer_id;
+          window.Paddle.Initialize({
+            token,
+            eventCallback: handlePaddleEvent,
+            ...(customerId && typeof customerId === 'string' && customerId.startsWith('ctm_')
+              ? { pwCustomer: { id: customerId } }
+              : {}),
+          });
+          paddleInitializedRef.current = true;
+        } catch (err) {
+          console.warn('[Paddle Init Notice]', err);
+        }
+      }
+    }
+  }, [details, handlePaddleEvent]);
+
+  async function handleCheckoutCompleted(data: any, plan?: PlanTier, interval?: BillingInterval) {
+    try {
+      setVerificationState({
+        status: 'verifying',
+        message: 'Verifying payment directly with Paddle...',
+      });
+
+      const transactionId = data?.transaction_id || data?.id;
+      const subscriptionId = data?.subscription_id || data?.items?.[0]?.subscription_id;
+      const customerId = data?.customer?.id || data?.customer_id;
+
+      const res = await api.confirmSession({
+        transaction_id: transactionId,
+        subscription_id: subscriptionId,
+        customer_id: customerId,
+        plan: plan || 'STARTER',
+        interval: interval || billingInterval,
+      });
+
+      if (res.success) {
+        setDetails(res);
+        setVerificationState({
+          status: 'success',
+          message: 'Your plan is now active.',
+        });
+        onShowToast('Payment verified! Your plan is now active.', 'success');
+        onSubscriptionUpdated?.();
+      } else {
+        setVerificationState({
+          status: 'error',
+          message: res.message || 'Payment could not be verified by Paddle.',
+        });
+      }
+    } catch (err: any) {
+      setVerificationState({
+        status: 'error',
+        message: err.message || 'Failed to verify Paddle checkout.',
+      });
+      onShowToast(err.message || 'Payment verification failed', 'error');
+    }
+  }
 
   async function verifyCheckoutSession(sessionId: string) {
     try {
       setVerificationState({
         status: 'verifying',
-        message: 'Verifying payment directly with Stripe...',
+        message: 'Verifying payment directly with Paddle...',
       });
 
       const res = await api.confirmSession(sessionId);
@@ -85,17 +203,16 @@ export function BillingView({
       } else {
         setVerificationState({
           status: 'error',
-          message: res.message || 'Payment could not be verified by Stripe.',
+          message: res.message || 'Payment could not be verified by Paddle.',
         });
       }
     } catch (err: any) {
       setVerificationState({
         status: 'error',
-        message: err.message || 'Failed to verify Stripe checkout session.',
+        message: err.message || 'Failed to verify checkout session.',
       });
       onShowToast(err.message || 'Payment verification failed', 'error');
     } finally {
-      // Clean query params
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }
@@ -116,24 +233,63 @@ export function BillingView({
     try {
       setActionLoading(targetPlan);
 
-      // Check if real Stripe is configured
-      if (!details?.stripe_configured) {
-        onShowToast(
-          'NOT CONFIGURED — Stripe credentials (STRIPE_SECRET_KEY) required to process real subscriptions.',
-          'error'
-        );
-        return;
-      }
-
-      // Real Stripe Checkout redirect
       const res = await api.createCheckoutSession(targetPlan, billingInterval);
-      if (res.url) {
-        window.location.href = res.url;
-        return;
+
+      const token = (res.client_token || '').trim();
+      const priceId = (res.price_id || '').trim();
+      const isTokenValid = Boolean(token && (token.startsWith('test_') || token.startsWith('live_')));
+      const isPriceValid = Boolean(priceId && priceId.startsWith('pri_'));
+
+      // If Paddle.js is loaded and credentials are valid, open official Paddle overlay
+      if (window.Paddle && isTokenValid && isPriceValid) {
+        try {
+          if (!paddleInitializedRef.current) {
+            // Live is the default in Paddle.js v2
+            const customerId = res.customer_id || details?.subscription?.paddle_customer_id;
+            window.Paddle.Initialize({
+              token,
+              eventCallback: handlePaddleEvent,
+              ...(customerId && typeof customerId === 'string' && customerId.startsWith('ctm_')
+                ? { pwCustomer: { id: customerId } }
+                : {}),
+            });
+            paddleInitializedRef.current = true;
+          }
+
+          // Clean, normalized customer email (no trailing whitespace, lowercased)
+          const cleanEmail = res.customer_email ? res.customer_email.trim().toLowerCase() : undefined;
+
+          window.Paddle.Checkout.open({
+            items: [{ priceId, quantity: 1 }],
+            customer: cleanEmail ? { email: cleanEmail } : undefined,
+            customData: res.custom_data,
+            settings: {
+              displayMode: 'overlay',
+              theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
+              successUrl: `${window.location.origin}/?billing_status=success`,
+            },
+          });
+          return;
+        } catch (paddleErr: any) {
+          console.error('[Paddle.js Open Error]', paddleErr);
+          onShowToast(paddleErr.message || 'Paddle checkout overlay failed to open.', 'error');
+        }
+      } else {
+        // Safe diagnostic notification: prevents Paddle's broken "Something went wrong" overlay
+        const envLabel = res.environment === 'production' ? 'Live' : 'Sandbox';
+        const expectedPrefix = res.environment === 'production' ? 'live_' : 'test_';
+        const reason = !isTokenValid
+          ? `PADDLE_CLIENT_TOKEN is missing or invalid (must start with '${expectedPrefix}' for ${envLabel}). Current: ${token ? token.slice(0, 8) + '...' : 'empty'}.`
+          : `Paddle Price ID for ${targetPlan} (${billingInterval}) is invalid (must start with 'pri_'). Current: ${priceId || 'empty'}.`;
+
+        onShowToast(
+          `${reason} Configure valid Paddle ${envLabel} credentials in Settings or use Developer Sandbox below to test instantly.`,
+          'info'
+        );
+        setShowSandbox(true);
       }
-      throw new Error('No checkout URL returned from server.');
     } catch (err: any) {
-      onShowToast(err.message || 'Failed to initiate Stripe checkout', 'error');
+      onShowToast(err.message || 'Failed to initiate Paddle checkout', 'error');
     } finally {
       setActionLoading(null);
     }
@@ -143,8 +299,10 @@ export function BillingView({
     try {
       setActionLoading('portal');
       const res = await api.createCustomerPortalSession();
-      if (res.url) {
-        window.location.href = res.url;
+      if (res.update_payment_method_url) {
+        window.open(res.update_payment_method_url, '_blank');
+      } else if (res.message) {
+        onShowToast(res.message, 'info');
       }
     } catch (err: any) {
       onShowToast(err.message || 'Failed to open customer portal', 'error');
@@ -170,6 +328,20 @@ export function BillingView({
       onSubscriptionUpdated?.();
     } catch (err: any) {
       onShowToast(err.message || 'Failed to cancel subscription', 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleOwnerDemoSwitch(plan: PlanTier) {
+    try {
+      setActionLoading(`owner-demo-${plan}`);
+      const res = await api.switchOwnerDemoPlan(plan);
+      setDetails(res);
+      onShowToast(`Owner demo plan switched to ${plan}. All limits and features updated.`, 'success');
+      onSubscriptionUpdated?.();
+    } catch (err: any) {
+      onShowToast(err.message || 'Failed to switch owner demo plan', 'error');
     } finally {
       setActionLoading(null);
     }
@@ -212,10 +384,10 @@ export function BillingView({
           <RefreshCw className="w-5 h-5 text-indigo-600 dark:text-indigo-400 animate-spin shrink-0" />
           <div>
             <h4 className="text-sm font-bold text-indigo-950 dark:text-indigo-200">
-              Verifying Stripe Payment...
+              Verifying Paddle Payment...
             </h4>
             <p className="text-xs text-indigo-700 dark:text-indigo-300">
-              Confirming transaction with Stripe API and synchronizing your account subscription.
+              Confirming transaction with Paddle API and synchronizing your account subscription.
             </p>
           </div>
         </div>
@@ -233,7 +405,7 @@ export function BillingView({
                   Your plan is now active.
                 </h3>
                 <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
-                  Thank you! Your payment was verified by Stripe. All limits and premium features for {currentPlan} are unlocked.
+                  Thank you! Your payment was verified by Paddle. All limits and premium features for {currentPlan} are unlocked.
                 </p>
               </div>
             </div>
@@ -291,7 +463,7 @@ export function BillingView({
             Subscription &amp; Billing
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Choose your plan, monitor quota usage, and manage your Stripe subscription safely.
+            Choose your plan, monitor quota usage, and manage your Paddle subscription safely.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -302,31 +474,78 @@ export function BillingView({
           >
             {showSandbox ? 'Hide Test Controls' : 'Developer Sandbox'}
           </button>
-          {details?.subscription.provider_customer_id && details.stripe_configured && (
+          {details?.subscription.provider_customer_id && details.paddle_configured && (
             <button
               type="button"
-              id="btn-stripe-portal"
+              id="btn-paddle-portal"
               onClick={handleOpenPortal}
               disabled={actionLoading === 'portal'}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs transition-colors"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              Stripe Customer Portal
+              Paddle Customer Portal
             </button>
           )}
         </div>
       </div>
 
-      {/* Stripe Status Callout: Clear & Honest */}
-      {!details?.stripe_configured && (
+      {/* Owner Demonstration Access Control Panel (Only visible for verified Owner account) */}
+      {details?.is_owner_demo && (
+        <div className="p-6 rounded-2xl bg-gradient-to-r from-indigo-50/80 via-purple-50/80 to-pink-50/80 dark:from-indigo-950/40 dark:via-purple-950/40 dark:to-pink-950/40 border border-indigo-200/80 dark:border-indigo-800/80 shadow-sm transition-all">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2.5">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-600 text-white shadow-xs">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Owner Demonstration Access
+                </span>
+                <span className="text-xs font-semibold text-indigo-900 dark:text-indigo-200">
+                  Active Tier: <span className="font-extrabold text-indigo-700 dark:text-indigo-300">{currentPlan}</span>
+                </span>
+              </div>
+              <p className="text-xs text-indigo-950 dark:text-indigo-200 max-w-xl leading-relaxed">
+                Free demonstration access is active for this verified owner account. Switch between Free, Starter, and Growth tiers instantly to test quota gates, client/invoice limits, and feature access without processing payments.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {(['FREE', 'STARTER', 'GROWTH'] as PlanTier[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  id={`btn-owner-demo-switch-${p.toLowerCase()}`}
+                  onClick={() => handleOwnerDemoSwitch(p)}
+                  disabled={currentPlan === p || actionLoading === `owner-demo-${p}`}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs ${
+                    currentPlan === p
+                      ? 'bg-indigo-600 text-white cursor-default ring-2 ring-indigo-400/50'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-indigo-200 dark:border-indigo-700 hover:bg-indigo-100/60 dark:hover:bg-indigo-900/50'
+                  }`}
+                >
+                  {actionLoading === `owner-demo-${p}` ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <>
+                      {currentPlan === p && <Check className="w-3.5 h-3.5" />}
+                      <span>{p}</span>
+                    </>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Paddle Status Callout: Clear & Honest */}
+      {!details?.paddle_configured && (
         <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <div className="text-xs text-amber-900 dark:text-amber-200">
             <span className="font-bold block text-sm mb-0.5">
-              NOT CONFIGURED — Stripe credentials required for live checkout
+              Paddle {details?.paddle_env === 'production' ? 'Live' : 'Sandbox'} Ready — API Credentials Needed for Checkout
             </span>
             <span>
-              Real Stripe payments require <code className="font-mono bg-amber-100 dark:bg-amber-900/60 px-1 py-0.5 rounded">STRIPE_SECRET_KEY</code> to be configured in your environment. You can use the Developer Sandbox below to preview different tier limits and feature gating safely.
+              Real Paddle {details?.paddle_env === 'production' ? 'Live' : 'Sandbox'} payments require <code className="font-mono bg-amber-100 dark:bg-amber-900/60 px-1 py-0.5 rounded">PADDLE_API_KEY</code> and <code className="font-mono bg-amber-100 dark:bg-amber-900/60 px-1 py-0.5 rounded">PADDLE_CLIENT_TOKEN</code> to be configured in your environment or settings. You can use the Developer Sandbox below to preview different tier limits and feature gating safely.
             </span>
           </div>
         </div>
@@ -341,9 +560,9 @@ export function BillingView({
               Developer Sandbox (Testing Only - Does NOT charge cards)
             </span>
             <span className="text-slate-500 dark:text-slate-400">
-              Stripe Integration:{' '}
-              <strong className={details?.stripe_configured ? 'text-emerald-600' : 'text-amber-600'}>
-                {details?.stripe_configured ? 'Live Stripe Configured' : 'Offline / Mock Testing'}
+              Paddle Sandbox:{' '}
+              <strong className={details?.paddle_configured ? 'text-emerald-600' : 'text-amber-600'}>
+                {details?.paddle_configured ? 'Paddle Sandbox Configured' : 'Offline / Mock Testing'}
               </strong>
             </span>
           </div>
@@ -752,10 +971,10 @@ export function BillingView({
 
             <div className="flex items-baseline gap-1 mb-6">
               <span className="text-4xl font-extrabold text-slate-900 dark:text-white">
-                ${billingInterval === 'annual' ? '24.16' : '29'}
+                ${billingInterval === 'annual' ? '20' : '24'}
               </span>
               <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                /mo {billingInterval === 'annual' ? '(billed $290/yr)' : ''}
+                /mo {billingInterval === 'annual' ? '(billed $240/yr)' : ''}
               </span>
             </div>
 
@@ -814,23 +1033,25 @@ export function BillingView({
         </div>
       </div>
 
-      {/* Security and Stripe Info */}
+      {/* Security and Paddle Info */}
       <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-600 dark:text-slate-400 transition-colors">
         <div className="flex items-center gap-3">
           <ShieldCheck className="w-6 h-6 text-emerald-600 shrink-0" />
           <div>
             <p className="font-semibold text-slate-800 dark:text-slate-200">
-              Secure Payments &amp; Immediate Upgrades
+              Secure Paddle {details?.paddle_env === 'production' ? 'Live' : 'Sandbox'} Billing &amp; Immediate Upgrades
             </p>
             <p className="text-slate-500 dark:text-slate-400">
-              Official Stripe Checkout handles cards directly. Raw card data is never stored on Receipto servers.
+              Paddle Merchant of Record handles payments, security, and global tax compliance directly. Raw payment details are never stored on Receipto servers.
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <CreditCard className="w-4 h-4 text-slate-400" />
           <span className="font-medium text-slate-700 dark:text-slate-300">
-            Visa, Mastercard, Amex, Apple Pay, Google Pay
+            {details?.paddle_env === 'production'
+              ? 'Paddle Live Checkout (Cards, PayPal, Apple Pay, Google Pay)'
+              : 'Paddle Sandbox Checkout (Test Cards & Mock Subscriptions)'}
           </span>
         </div>
       </div>

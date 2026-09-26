@@ -1,7 +1,11 @@
+import fs from 'fs';
+import path from 'path';
+
 export type PlanTier = 'FREE' | 'STARTER' | 'GROWTH';
 export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'cancelled' | 'expired';
 export type BillingInterval = 'monthly' | 'annual';
-export type SubscriptionProvider = 'stripe' | 'manual';
+export type SubscriptionProvider = 'paddle' | 'manual' | 'demo';
+export type AccessMode = 'paddle' | 'owner_demo' | 'free';
 
 export interface PlanLimits {
   maxClients: number | null; // null represents unlimited
@@ -101,8 +105,8 @@ export const PLAN_CONFIGS: Record<PlanTier, PlanConfig> = {
     name: 'Growth',
     badge: 'Scale',
     tagline: 'Unlimited capacity, customizable reminder cadences & priority support.',
-    priceMonthly: 29,
-    priceAnnual: 290,
+    priceMonthly: 24,
+    priceAnnual: 240,
     limits: {
       maxClients: null, // Unlimited
       maxInvoicesPerMonth: null, // Unlimited
@@ -172,4 +176,97 @@ export function getEffectivePlan(
 
   // Gracefully fallback to FREE limits when paid period has expired or payment failed
   return PLAN_CONFIGS.FREE;
+}
+
+/**
+ * Gets the authoritative configured owner email.
+ * Strictly server-side; NEVER expose this email to frontend clients.
+ */
+export function getOwnerDemoEmail(): string {
+  const envEmail = process.env.OWNER_DEMO_EMAIL?.trim().toLowerCase();
+  if (envEmail && envEmail.includes('@')) {
+    return envEmail;
+  }
+  try {
+    const overrideFile = path.join(process.cwd(), 'data', 'owner_override.json');
+    if (fs.existsSync(overrideFile)) {
+      const parsed = JSON.parse(fs.readFileSync(overrideFile, 'utf8'));
+      if (parsed.email && parsed.email.includes('@')) {
+        return parsed.email.trim().toLowerCase();
+      }
+    }
+  } catch {}
+  return 'shimelisyilma04@gmail.com';
+}
+
+/**
+ * Checks if an email matches the configured OWNER_DEMO_EMAIL.
+ * Strictly server-side; NEVER expose the email to frontend clients.
+ */
+export function isOwnerEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const ownerEmail = getOwnerDemoEmail();
+  if (!ownerEmail) return false;
+  return email.trim().toLowerCase() === ownerEmail;
+}
+
+/**
+ * Checks if a user account is the verified owner account.
+ * Both email matching and email_verified === true are strictly required.
+ */
+export function isOwnerAccount(user: { email?: string; email_verified?: boolean } | null | undefined): boolean {
+  if (!user || !user.email) return false;
+  const ownerEmail = getOwnerDemoEmail();
+  if (!ownerEmail) return false;
+  return user.email.trim().toLowerCase() === ownerEmail && Boolean(user.email_verified);
+}
+
+/**
+ * Gets the default demo plan for the owner account from environment or defaults to GROWTH.
+ */
+export function getDefaultOwnerPlan(): PlanTier {
+  const envPlan = process.env.OWNER_DEMO_PLAN?.trim().toUpperCase();
+  if (envPlan === 'FREE' || envPlan === 'STARTER' || envPlan === 'GROWTH') {
+    return envPlan as PlanTier;
+  }
+  return 'GROWTH';
+}
+
+/**
+ * Generates user-friendly, structured limit reached messages with clear upgrade path.
+ */
+export function getPlanLimitReachedMessage(
+  resource: 'clients' | 'invoices',
+  plan: PlanTier,
+  limit: number
+): string {
+  if (resource === 'clients') {
+    if (plan === 'FREE') {
+      return `You've reached your Free plan limit of ${limit} clients. Upgrade to Starter for up to 50 clients.`;
+    }
+    return `You've reached your Starter plan limit of ${limit} clients. Upgrade to Growth for unlimited clients.`;
+  } else {
+    if (plan === 'FREE') {
+      return `You've reached your Free plan limit of ${limit} invoices. Upgrade to Starter for up to 100 invoices per period.`;
+    }
+    return `You've reached your Starter plan limit of ${limit} invoices. Upgrade to Growth for unlimited invoices.`;
+  }
+}
+
+export class PlanLimitExceededError extends Error {
+  code = 'PLAN_LIMIT_REACHED';
+  resource: 'clients' | 'invoices';
+  current: number;
+  limit: number;
+  plan: PlanTier;
+
+  constructor(resource: 'clients' | 'invoices', current: number, limit: number, plan: PlanTier) {
+    const msg = getPlanLimitReachedMessage(resource, plan, limit);
+    super(msg);
+    this.name = 'PlanLimitExceededError';
+    this.resource = resource;
+    this.current = current;
+    this.limit = limit;
+    this.plan = plan;
+  }
 }

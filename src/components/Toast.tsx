@@ -1,9 +1,9 @@
 import React from 'react';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 
 export interface ToastMessage {
   id: string;
-  type: 'success' | 'error' | 'info';
+  type: 'success' | 'error' | 'warning' | 'info';
   message: string;
 }
 
@@ -25,11 +25,14 @@ export function ToastContainer({ toasts, onDismiss }: ToastProps) {
               ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
               : toast.type === 'error'
               ? 'bg-rose-50 border-rose-200 text-rose-900'
+              : toast.type === 'warning'
+              ? 'bg-amber-50 border-amber-200 text-amber-900'
               : 'bg-slate-50 border-slate-200 text-slate-900'
           }`}
         >
           {toast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />}
           {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />}
+          {toast.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />}
           {toast.type === 'info' && <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />}
 
           <div className="flex-1 font-medium leading-snug">{toast.message}</div>

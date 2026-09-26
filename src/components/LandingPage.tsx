@@ -32,6 +32,7 @@ interface LandingPageProps {
   onGoToDashboard: () => void;
   onOpenTerms: () => void;
   onOpenSupport?: () => void;
+  onNavigateLegal?: (tab: 'terms' | 'privacy' | 'refund') => void;
 }
 
 export function LandingPage({
@@ -40,6 +41,7 @@ export function LandingPage({
   onGoToDashboard,
   onOpenTerms,
   onOpenSupport,
+  onNavigateLegal,
 }: LandingPageProps) {
   const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
   const [demoTone, setDemoTone] = useState<'friendly' | 'standard' | 'urgent'>('friendly');
@@ -107,7 +109,7 @@ export function LandingPage({
     },
     {
       q: 'Can I upgrade, downgrade, or cancel anytime?',
-      a: 'Absolutely. Paid subscriptions are billed transparently via Stripe. You can upgrade or cancel your plan at any time with one click in your billing settings.',
+      a: 'Absolutely. Paid subscriptions are billed transparently via Paddle. You can upgrade or cancel your plan at any time with one click in your billing settings.',
     },
   ];
 
@@ -782,25 +784,40 @@ export function LandingPage({
             <span>Accounts-Receivable Follow-Up SaaS</span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-6">
+          <div className="flex flex-wrap items-center gap-5 sm:gap-6">
             {onOpenSupport && (
               <button
                 type="button"
                 id="btn-footer-support"
                 onClick={onOpenSupport}
-                className="hover:text-slate-900 dark:hover:text-white transition flex items-center gap-1.5"
+                className="hover:text-slate-900 dark:hover:text-white transition flex items-center gap-1.5 text-xs"
               >
                 <LifeBuoy className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                 <span>Support: shimelisyilma04@gmail.com</span>
               </button>
             )}
             <button
-              onClick={onOpenTerms}
-              className="hover:text-slate-900 dark:hover:text-white transition underline-offset-4 hover:underline"
+              onClick={() => (onNavigateLegal ? onNavigateLegal('terms') : onOpenTerms())}
+              className="hover:text-slate-900 dark:hover:text-white transition underline-offset-4 hover:underline text-xs"
             >
-              Terms of Service &amp; Privacy Policy
+              Terms of Service
             </button>
-            <span>&copy; {new Date().getFullYear()} Receipto. All rights reserved.</span>
+            <button
+              onClick={() => (onNavigateLegal ? onNavigateLegal('privacy') : onOpenTerms())}
+              className="hover:text-slate-900 dark:hover:text-white transition underline-offset-4 hover:underline text-xs"
+            >
+              Privacy Policy
+            </button>
+            <button
+              onClick={() => (onNavigateLegal ? onNavigateLegal('refund') : onOpenTerms())}
+              className="hover:text-slate-900 dark:hover:text-white transition underline-offset-4 hover:underline text-xs"
+            >
+              Refund &amp; Cancellation Policy
+            </button>
+            <span className="text-slate-400 dark:text-slate-500 text-xs">
+              Billed via Paddle.com (Merchant of Record)
+            </span>
+            <span className="text-slate-400 dark:text-slate-500 text-xs">&copy; {new Date().getFullYear()} Receipto.</span>
           </div>
         </div>
       </footer>

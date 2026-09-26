@@ -99,6 +99,7 @@ export function Navbar({
   function handleUpgradeClick() {
     onSelectTab('billing');
     setMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function handleSupportClick() {
@@ -110,30 +111,45 @@ export function Navbar({
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* 1. RECEIPTO LOGO / DASHBOARD SHORTCUT */}
-          <button
-            type="button"
-            id="btn-logo-dashboard-shortcut"
-            onClick={handleLogoClick}
-            className="flex items-center gap-3.5 sm:gap-4.5 p-1.5 -ml-1 rounded-xl text-left transition-transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-indigo-500 group mr-3 sm:mr-6 shrink-0"
-            title="Receipto Dashboard (Shortcut)"
-            aria-label="Receipto Dashboard shortcut"
-          >
-            <ReceiptoLogo size="sm" className="transition-transform group-hover:drop-shadow-[0_0_12px_rgba(59,130,246,0.5)]" />
-            <div className="pl-0.5">
-              <div className="flex items-center gap-2.5">
-                <span className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+          {/* 1. RECEIPTO LOGO & UPGRADE BUTTON */}
+          <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0 mr-2 sm:mr-6">
+            <button
+              type="button"
+              id="btn-logo-dashboard-shortcut"
+              onClick={handleLogoClick}
+              className="flex items-center gap-3 sm:gap-3.5 p-1.5 -ml-1 rounded-xl text-left transition-transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-indigo-500 group shrink-0"
+              title="Receipto Dashboard (Shortcut)"
+              aria-label="Receipto Dashboard shortcut"
+            >
+              <ReceiptoLogo size="sm" className="transition-transform group-hover:drop-shadow-[0_0_12px_rgba(59,130,246,0.5)]" />
+              <div className="pl-0.5">
+                <span className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors block">
                   Receipto
                 </span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
-                  v1.2.0
-                </span>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block leading-none mt-0.5">
+                  Invoice Tracking &amp; Automated Follow-up
+                </p>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block leading-none mt-0.5">
-                Invoice Tracking &amp; Automated Follow-up
-              </p>
-            </div>
-          </button>
+            </button>
+
+            {/* Upgrade your plan button - visible ONLY for FREE tier users */}
+            {plan === 'FREE' && (
+              <button
+                type="button"
+                id="btn-nav-upgrade-plan-free"
+                onClick={handleUpgradeClick}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-950 dark:text-amber-950 bg-amber-400 hover:bg-amber-300 dark:bg-amber-400 dark:hover:bg-amber-300 rounded-lg shadow-sm hover:shadow transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer shrink-0 border border-amber-500/40 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950"
+                title="Upgrade your plan to unlock more clients and automated reminders"
+                aria-label="Upgrade your plan"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-950 fill-amber-200 shrink-0" />
+                <span className="whitespace-nowrap">
+                  <span className="hidden sm:inline">Upgrade your plan</span>
+                  <span className="sm:hidden">Upgrade</span>
+                </span>
+              </button>
+            )}
+          </div>
 
           {/* Desktop Navigation Links */}
           <nav className="hidden lg:flex items-center gap-1">

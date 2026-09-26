@@ -1,7 +1,8 @@
 export type PlanTier = 'FREE' | 'STARTER' | 'GROWTH';
 export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'cancelled' | 'expired';
 export type BillingInterval = 'monthly' | 'annual';
-export type SubscriptionProvider = 'stripe' | 'manual';
+export type SubscriptionProvider = 'paddle' | 'manual' | 'demo';
+export type AccessMode = 'paddle' | 'owner_demo' | 'free';
 
 export interface PlanLimits {
   maxClients: number | null; // null represents unlimited
@@ -101,8 +102,8 @@ export const PLAN_CONFIGS: Record<PlanTier, PlanConfig> = {
     name: 'Growth',
     badge: 'Scale',
     tagline: 'Unlimited capacity, customizable reminder cadences & priority support.',
-    priceMonthly: 29,
-    priceAnnual: 290,
+    priceMonthly: 24,
+    priceAnnual: 240,
     limits: {
       maxClients: null, // Unlimited
       maxInvoicesPerMonth: null, // Unlimited
@@ -172,4 +173,43 @@ export function getEffectivePlan(
 
   // Gracefully fallback to FREE limits when paid period has expired or payment failed
   return PLAN_CONFIGS.FREE;
+}
+
+/**
+ * Generates user-friendly, structured limit reached messages with clear upgrade path.
+ */
+export function getPlanLimitReachedMessage(
+  resource: 'clients' | 'invoices',
+  plan: PlanTier,
+  limit: number
+): string {
+  if (resource === 'clients') {
+    if (plan === 'FREE') {
+      return `You've reached your Free plan limit of ${limit} clients. Upgrade to Starter for up to 50 clients.`;
+    }
+    return `You've reached your Starter plan limit of ${limit} clients. Upgrade to Growth for unlimited clients.`;
+  } else {
+    if (plan === 'FREE') {
+      return `You've reached your Free plan limit of ${limit} invoices. Upgrade to Starter for up to 100 invoices per period.`;
+    }
+    return `You've reached your Starter plan limit of ${limit} invoices. Upgrade to Growth for unlimited invoices.`;
+  }
+}
+
+export class PlanLimitExceededError extends Error {
+  code = 'PLAN_LIMIT_REACHED';
+  resource: 'clients' | 'invoices';
+  current: number;
+  limit: number;
+  plan: PlanTier;
+
+  constructor(resource: 'clients' | 'invoices', current: number, limit: number, plan: PlanTier) {
+    const msg = getPlanLimitReachedMessage(resource, plan, limit);
+    super(msg);
+    this.name = 'PlanLimitExceededError';
+    this.resource = resource;
+    this.current = current;
+    this.limit = limit;
+    this.plan = plan;
+  }
 }

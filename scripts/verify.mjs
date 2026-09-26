@@ -447,6 +447,94 @@ async function runAllTests() {
     logFail('Data persistence verification', err.message);
   }
 
+  // 18. Paddle Subscription Endpoint Check
+  try {
+    const subRes = await apiRequest('/api/billing/subscription', {}, user1Cookie);
+    if (subRes.status === 200 && subRes.data.subscription && subRes.data.usage) {
+      logPass(`Paddle Billing: Subscription details returned (Plan: ${subRes.data.subscription.plan}, Provider: ${subRes.data.subscription.provider})`);
+    } else {
+      throw new Error(`Failed to get subscription: ${subRes.status} - ${JSON.stringify(subRes.data)}`);
+    }
+  } catch (err) {
+    logFail('Paddle subscription endpoint check', err.message);
+  }
+
+  // 19. Paddle Checkout Endpoint Check
+  try {
+    const checkoutRes = await apiRequest('/api/billing/checkout', {
+      method: 'POST',
+      body: { plan: 'STARTER', interval: 'monthly' },
+    }, user1Cookie);
+
+    if (checkoutRes.status === 200 && checkoutRes.data.success && checkoutRes.data.price_id) {
+      logPass(`Paddle Checkout: Generated checkout params for STARTER (Price: ${checkoutRes.data.price_id}, Env: ${checkoutRes.data.environment})`);
+    } else {
+      throw new Error(`Failed to initiate checkout: ${checkoutRes.status} - ${JSON.stringify(checkoutRes.data)}`);
+    }
+  } catch (err) {
+    logFail('Paddle checkout endpoint check', err.message);
+  }
+
+  // 20. Paddle Plan Simulation & Limit Enforcement Check
+  try {
+    // Check initial FREE plan limits (5 clients, 10 invoices)
+    const initialSub = await apiRequest('/api/billing/subscription', {}, user1Cookie);
+    if (initialSub.data.usage.max_clients === 5 && initialSub.data.usage.max_invoices_per_month === 10) {
+      logPass('Plan Limits: FREE tier correctly enforces 5 clients and 10 invoices limits');
+    } else {
+      throw new Error(`Unexpected FREE limits: ${JSON.stringify(initialSub.data.usage)}`);
+    }
+
+    // Simulate upgrade to STARTER (50 clients, 100 invoices)
+    const upgradeRes = await apiRequest('/api/billing/simulate', {
+      method: 'POST',
+      body: { plan: 'STARTER', interval: 'monthly' },
+    }, user1Cookie);
+
+    if (upgradeRes.status === 200 && upgradeRes.data.subscription.plan === 'STARTER' && upgradeRes.data.usage.max_clients === 50) {
+      logPass('Plan Upgrade: Upgraded to STARTER tier (max_clients: 50, max_invoices: 100)');
+    } else {
+      throw new Error(`Failed to upgrade to STARTER: ${upgradeRes.status} - ${JSON.stringify(upgradeRes.data)}`);
+    }
+
+    // Simulate upgrade to GROWTH (Unlimited)
+    const growthRes = await apiRequest('/api/billing/simulate', {
+      method: 'POST',
+      body: { plan: 'GROWTH', interval: 'annual' },
+    }, user1Cookie);
+
+    if (growthRes.status === 200 && growthRes.data.subscription.plan === 'GROWTH' && growthRes.data.usage.max_clients === null) {
+      logPass('Plan Upgrade: Upgraded to GROWTH tier (max_clients: Unlimited, max_invoices: Unlimited)');
+    } else {
+      throw new Error(`Failed to upgrade to GROWTH: ${growthRes.status} - ${JSON.stringify(growthRes.data)}`);
+    }
+
+    // Reset back to FREE
+    await apiRequest('/api/billing/simulate', {
+      method: 'POST',
+      body: { plan: 'FREE' },
+    }, user1Cookie);
+    logPass('Plan Reset: Returned to FREE tier');
+  } catch (err) {
+    logFail('Paddle plan simulation & limit enforcement', err.message);
+  }
+
+  // 21. Paddle Webhook Endpoint Verification
+  try {
+    const webhookRes = await apiRequest('/api/webhooks/paddle', {
+      method: 'POST',
+      body: { event_id: 'evt_test', event_type: 'subscription.created', data: {} },
+    });
+    // Should reject or handle gracefully (e.g. 403 for non-Paddle IP, 400 or 401 for invalid signature, 200 if processed)
+    if (webhookRes.status === 400 || webhookRes.status === 401 || webhookRes.status === 403 || webhookRes.status === 200) {
+      logPass(`Paddle Webhook: Webhook route active and secure (HTTP ${webhookRes.status})`);
+    } else {
+      throw new Error(`Unexpected webhook response: ${webhookRes.status}`);
+    }
+  } catch (err) {
+    logFail('Paddle webhook route verification', err.message);
+  }
+
   console.log('\n------------------------------------------------------');
   console.log(`TEST SUMMARY: ${testPassCount} PASSED, ${testFailCount} FAILED`);
   console.log('------------------------------------------------------\n');

@@ -80,13 +80,14 @@ export async function runWorkerCycle(): Promise<{
         // Check if reminder was already sent in the last 3 days for this invoice
         const recentReminders = await db.getRecentRemindersForInvoice(inv.id, 3);
         if (recentReminders.length > 0) {
-          continue; // Already reminded recently
+          continue; // Already reminded recently or in-flight
         }
 
         const client = await db.getClientById(user.id, inv.client_id);
-        if (!client || !client.email) continue;
+        if (!client || !client.email || !client.email.includes('@')) continue;
 
         // Dispatch reminder
+        const now = new Date().toISOString();
         const tone: 'friendly' | 'standard' | 'urgent' = 'urgent';
         const emailRes = await sendReminderEmail({
           to: client.email,
@@ -107,6 +108,11 @@ export async function runWorkerCycle(): Promise<{
             subject: `Automated Reminder: Invoice #${inv.invoice_number}`,
             message: `Automated reminder dispatched for overdue invoice #${inv.invoice_number}`,
             status: 'SENT',
+            reminder_type: 'automatic',
+            sent_at: now,
+            attempted_at: now,
+            provider_message_id: emailRes.messageId,
+            attempt_count: 1,
           });
 
           await db.createActivityLog(
@@ -117,12 +123,30 @@ export async function runWorkerCycle(): Promise<{
               invoice_id: inv.id,
               client_id: inv.client_id,
               invoice_number: inv.invoice_number,
+              provider_message_id: emailRes.messageId,
               worker: true,
             }
           );
 
           sentCount++;
           state.totalRemindersSent++;
+        } else {
+          // Record failed or config required attempt
+          const status = emailRes.configured ? 'FAILED' : 'CONFIG_REQUIRED';
+          await db.createReminder(user.id, {
+            invoice_id: inv.id,
+            client_id: inv.client_id,
+            recipient_email: client.email,
+            subject: `Automated Reminder: Invoice #${inv.invoice_number}`,
+            message: `Automated reminder dispatch attempted for overdue invoice #${inv.invoice_number}`,
+            status,
+            reminder_type: 'automatic',
+            attempted_at: now,
+            error_message: emailRes.error || emailRes.statusText,
+            attempt_count: 1,
+          });
+
+          console.warn(`[Background Worker] Automated reminder for invoice #${inv.invoice_number} resulted in ${status}: ${emailRes.error || emailRes.statusText}`);
         }
       }
     }
