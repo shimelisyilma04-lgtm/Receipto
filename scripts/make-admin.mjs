@@ -31,8 +31,11 @@ async function run() {
   console.log(`========================================\n`);
 
   const databaseUrl = process.env.DATABASE_URL;
+  const isPostgresValid = databaseUrl && 
+    (databaseUrl.startsWith('postgres://') || databaseUrl.startsWith('postgresql://')) && 
+    !/\[.*?\]|<.*?>|YOUR_PASSWORD/i.test(databaseUrl);
 
-  if (databaseUrl && !databaseUrl.includes('localhost:5432/placeholder')) {
+  if (isPostgresValid && !databaseUrl.includes('localhost:5432/placeholder')) {
     console.log('Connecting to PostgreSQL database...');
     const pool = new Pool({
       connectionString: databaseUrl,

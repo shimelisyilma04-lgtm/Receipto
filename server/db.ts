@@ -190,13 +190,39 @@ export function computeInvoiceStatus(invoice: Invoice, todayStr?: string): Payme
   return 'UNPAID';
 }
 
+// Validate whether a connection string is a valid, parseable PostgreSQL URL without placeholders
+export function isValidPostgresUrl(url: string | undefined): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed.startsWith('postgres://') && !trimmed.startsWith('postgresql://')) {
+    return false;
+  }
+  // Check for template placeholder tokens like [ref], [password], <password>, etc.
+  if (/\[.*?\]|<.*?>|YOUR_PASSWORD|\[YOUR-PASSWORD\]/i.test(trimmed)) {
+    return false;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (!parsed.hostname || parsed.hostname.includes('[') || parsed.hostname.includes(']')) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function isDatabaseConfigured(): boolean {
+  return isValidPostgresUrl(process.env.DATABASE_URL);
+}
+
 // Initialize database schema
 export async function initDatabase(): Promise<{ success: boolean; engine: 'postgres' | 'local_persistent'; error?: string }> {
   const databaseUrl = process.env.DATABASE_URL?.trim();
 
-  if (databaseUrl && (databaseUrl.startsWith('postgres://') || databaseUrl.startsWith('postgresql://'))) {
+  if (isValidPostgresUrl(databaseUrl)) {
     try {
-      const useSsl = !databaseUrl.includes('localhost') && !databaseUrl.includes('127.0.0.1');
+      const useSsl = !databaseUrl!.includes('localhost') && !databaseUrl!.includes('127.0.0.1');
       pool = new Pool({
         connectionString: databaseUrl,
         ssl: useSsl ? { rejectUnauthorized: false } : false,
@@ -411,11 +437,17 @@ export async function initDatabase(): Promise<{ success: boolean; engine: 'postg
         client.release();
       }
     } catch (err: any) {
-      console.error('[Database] Failed to connect to PostgreSQL with DATABASE_URL:', err.message);
+      if (pool) {
+        pool.end().catch(() => {});
+        pool = null;
+      }
+      console.warn('[Database] Could not connect to PostgreSQL with DATABASE_URL:', err.message);
       console.warn('[Database] Falling back to local persistent file store for high availability.');
     }
+  } else if (databaseUrl && (/\[.*?\]|<.*?>/i.test(databaseUrl) || !databaseUrl.startsWith('postgres'))) {
+    console.warn('[Database] DATABASE_URL contains unconfigured template placeholders or invalid URL format. Using local persistent storage in ./data/receipto_db.json.');
   } else {
-    console.log('[Database] DATABASE_URL not set or not postgresql. Using local persistent storage in ./data/receipto_db.json.');
+    console.log('[Database] DATABASE_URL not set. Using local persistent storage in ./data/receipto_db.json.');
   }
 
   // Local persistent fallback

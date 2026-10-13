@@ -31,6 +31,7 @@ import {
   getActivityLogs,
   getDashboardStats,
   checkDatabaseHealth,
+  isDatabaseConfigured,
   getSubscription,
   upsertSubscription,
   getUserUsage,
@@ -148,7 +149,7 @@ export async function healthHandler(req: Request, res: Response) {
       database: {
         connected: dbHealth.connected,
         engine: dbHealth.engine,
-        configured: Boolean(process.env.DATABASE_URL),
+        configured: isDatabaseConfigured(),
         details: dbHealth.details,
       },
       email_service: {
@@ -2667,7 +2668,7 @@ router.get('/settings/config', requireAuth, async (req: AuthenticatedRequest, re
       database: {
         engine: dbHealth.engine,
         connected: dbHealth.connected,
-        configured: Boolean(process.env.DATABASE_URL),
+        configured: isDatabaseConfigured(),
       },
       email_service: {
         provider: 'Resend',

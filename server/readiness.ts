@@ -48,13 +48,35 @@ export function evaluateProductionReadiness(): ProductionReadinessReport {
       description: 'Database connection string must begin with postgres:// or postgresql://',
       recommendation: 'Verify the DATABASE_URL protocol prefix.',
     });
-  } else {
+  } else if (/\[.*?\]|<.*?>|YOUR_PASSWORD|\[YOUR-PASSWORD\]/i.test(dbUrl)) {
     checks.push({
       key: 'DATABASE_URL',
       category: 'DATABASE',
-      status: 'CONFIGURED',
-      description: 'PostgreSQL connection string is configured.',
+      status: 'INVALID FORMAT',
+      description: 'Database connection string contains placeholder tokens ([ref], [password], etc.).',
+      recommendation: 'Replace template placeholders with your real Supabase or Postgres database credentials.',
     });
+  } else {
+    try {
+      const parsed = new URL(dbUrl);
+      if (!parsed.hostname || parsed.hostname.includes('[') || parsed.hostname.includes(']')) {
+        throw new Error('Invalid hostname in URL');
+      }
+      checks.push({
+        key: 'DATABASE_URL',
+        category: 'DATABASE',
+        status: 'CONFIGURED',
+        description: 'PostgreSQL connection string is configured.',
+      });
+    } catch {
+      checks.push({
+        key: 'DATABASE_URL',
+        category: 'DATABASE',
+        status: 'INVALID FORMAT',
+        description: 'Database connection string is not a valid parseable URL.',
+        recommendation: 'Verify the connection string format.',
+      });
+    }
   }
 
   // 2. SESSION_SECRET
