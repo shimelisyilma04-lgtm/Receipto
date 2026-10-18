@@ -118,6 +118,7 @@ export interface DashboardStats {
   client_count: number;
   urgent_invoices: Invoice[];
   recent_activity: ActivityLog[];
+  upcoming_due_invoices?: any[];
 }
 
 export type PlanTier = 'FREE' | 'STARTER' | 'GROWTH';
@@ -149,30 +150,56 @@ export interface SubscriptionUsage {
   client_count: number;
   max_clients: number | null;
   clients_remaining: number | null;
+  client_limit_reached?: boolean;
   invoices_this_period: number;
+  invoice_count?: number;
   max_invoices_per_month: number | null;
   invoices_remaining: number | null;
+  invoice_limit_reached?: boolean;
   period_start: string;
   period_end: string | null;
   automated_reminders_count: number;
+  automated_reminders_enabled?: boolean;
+  csv_export_enabled?: boolean;
+  full_activity_history?: boolean;
+  plan?: PlanTier;
+}
+
+export interface SubscriptionDetails {
+  subscription: Subscription;
+  plan_config: any;
+  usage: SubscriptionUsage;
 }
 
 export interface AdminDashboardStats {
   total_users: number;
-  verified_users: number;
-  unverified_users: number;
-  free_users: number;
-  starter_users: number;
-  growth_users: number;
-  active_subscriptions: number;
-  past_due_subscriptions: number;
-  cancelled_subscriptions: number;
-  total_invoices: number;
-  paid_invoices: number;
-  overdue_invoices: number;
-  reminders_sent: number;
-  recent_activity: ActivityLog[];
-  system_health: {
+  admin_users?: number;
+  active_users?: number;
+  suspended_users?: number;
+  verified_users?: number;
+  unverified_users?: number;
+  free_users?: number;
+  starter_users?: number;
+  growth_users?: number;
+  active_subscriptions?: number;
+  past_due_subscriptions?: number;
+  cancelled_subscriptions?: number;
+  total_clients?: number;
+  total_invoices?: number;
+  paid_invoices?: number;
+  total_paid_invoices_amount?: number;
+  overdue_invoices?: number;
+  reminders_sent?: number;
+  total_reminders_sent?: number;
+  subscriptions_by_plan?: {
+    FREE: number;
+    STARTER: number;
+    GROWTH: number;
+  };
+  active_paid_subscriptions_count?: number;
+  mrr_usd?: number;
+  recent_activity?: ActivityLog[];
+  system_health?: {
     database: 'PASS' | 'FAIL';
     email: 'PASS' | 'NOT CONFIGURED' | 'FAIL';
     paddle: 'PASS' | 'NOT CONFIGURED';
@@ -218,7 +245,7 @@ export interface AdminSubscriptionItem {
 export interface AdminSystemHealth {
   database: {
     status: 'PASS' | 'FAIL';
-    engine: 'postgres' | 'local_persistent';
+    engine: 'firestore' | 'postgres' | 'local_persistent';
     connected: boolean;
     latency_ms?: number;
     details?: string;
@@ -234,7 +261,7 @@ export interface AdminSystemHealth {
     status: 'PASS' | 'NOT CONFIGURED' | 'FAIL';
     configured: boolean;
     webhook_configured: boolean;
-    price_ids_configured: boolean;
+    price_ids_configured?: boolean;
     environment: string;
   };
   application: {
@@ -247,7 +274,7 @@ export interface AdminSystemHealth {
     node_version: string;
   };
   worker: {
-    status: 'PASS' | 'WARNING' | 'FAIL';
+    status: 'PASS' | 'WARNING' | 'FAIL' | 'active';
     running: boolean;
     last_run_at: string | null;
     last_success_at: string | null;

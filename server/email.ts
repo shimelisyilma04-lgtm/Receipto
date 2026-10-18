@@ -140,7 +140,8 @@ ${safeBusiness}
 
 export async function sendReminderEmail(options: SendReminderOptions): Promise<EmailResult> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || 'Receipto <billing@resend.dev>';
+  const fromEmail = (process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL)?.trim() || 'Receipto <billing@resend.dev>';
+  const replyTo = process.env.EMAIL_REPLY_TO?.trim();
 
   // Validate API key: must exist, start with re_, and not be a placeholder
   if (!apiKey || !apiKey.startsWith('re_') || apiKey.length < 20 || apiKey.includes('placeholder')) {
@@ -155,19 +156,24 @@ export async function sendReminderEmail(options: SendReminderOptions): Promise<E
   const { subject, html, text } = generateReminderEmailContent(options);
 
   try {
+    const payload: any = {
+      from: fromEmail,
+      to: [options.to],
+      subject,
+      html,
+      text,
+    };
+    if (replyTo) {
+      payload.reply_to = replyTo;
+    }
+
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        from: fromEmail,
-        to: [options.to],
-        subject,
-        html,
-        text,
-      }),
+      body: JSON.stringify(payload),
     });
 
     const data = await response.json() as any;

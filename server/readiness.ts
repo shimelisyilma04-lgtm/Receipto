@@ -1,5 +1,7 @@
 // Production Readiness Checker for Receipto
 // Evaluates required environment configurations without exposing secret values.
+import fs from 'fs';
+import path from 'path';
 
 export type ReadinessStatus = 'CONFIGURED' | 'MISSING' | 'INVALID FORMAT' | 'NOT TESTED';
 
@@ -25,58 +27,53 @@ export interface ProductionReadinessReport {
 }
 
 export function evaluateProductionReadiness(): ProductionReadinessReport {
-  const env = process.env.PADDLE_ENV?.trim().toLowerCase() || 'production';
+  const env =
+    process.env.PADDLE_ENVIRONMENT?.trim().toLowerCase() ||
+    process.env.PADDLE_ENV?.trim().toLowerCase() ||
+    'sandbox';
   const isProduction = env === 'production' || env === 'live';
 
   const checks: EnvCheckItem[] = [];
 
-  // 1. DATABASE_URL
-  const dbUrl = process.env.DATABASE_URL?.trim();
-  if (!dbUrl) {
-    checks.push({
-      key: 'DATABASE_URL',
-      category: 'DATABASE',
-      status: 'MISSING',
-      description: 'Database connection string for PostgreSQL persistence.',
-      recommendation: 'Configure a valid Postgres connection string (e.g. Supabase, Neon, or Cloud SQL).',
-    });
-  } else if (!dbUrl.startsWith('postgres://') && !dbUrl.startsWith('postgresql://')) {
-    checks.push({
-      key: 'DATABASE_URL',
-      category: 'DATABASE',
-      status: 'INVALID FORMAT',
-      description: 'Database connection string must begin with postgres:// or postgresql://',
-      recommendation: 'Verify the DATABASE_URL protocol prefix.',
-    });
-  } else if (/\[.*?\]|<.*?>|YOUR_PASSWORD|\[YOUR-PASSWORD\]/i.test(dbUrl)) {
-    checks.push({
-      key: 'DATABASE_URL',
-      category: 'DATABASE',
-      status: 'INVALID FORMAT',
-      description: 'Database connection string contains placeholder tokens ([ref], [password], etc.).',
-      recommendation: 'Replace template placeholders with your real Supabase or Postgres database credentials.',
-    });
-  } else {
+  // 1. FIREBASE_CONFIG / CLOUD FIRESTORE
+  const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+  const hasFirebaseConfig = fs.existsSync(configPath);
+  if (hasFirebaseConfig) {
     try {
-      const parsed = new URL(dbUrl);
-      if (!parsed.hostname || parsed.hostname.includes('[') || parsed.hostname.includes(']')) {
-        throw new Error('Invalid hostname in URL');
+      const cfg = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      if (cfg.projectId && cfg.apiKey && cfg.firestoreDatabaseId) {
+        checks.push({
+          key: 'FIREBASE_CONFIG',
+          category: 'DATABASE',
+          status: 'CONFIGURED',
+          description: `Cloud Firestore and Firebase Authentication configured (Project: ${cfg.projectId}).`,
+        });
+      } else {
+        checks.push({
+          key: 'FIREBASE_CONFIG',
+          category: 'DATABASE',
+          status: 'INVALID FORMAT',
+          description: 'firebase-applet-config.json is missing required fields (projectId, apiKey, or firestoreDatabaseId).',
+          recommendation: 'Verify your firebase-applet-config.json file against Firebase console credentials.',
+        });
       }
-      checks.push({
-        key: 'DATABASE_URL',
-        category: 'DATABASE',
-        status: 'CONFIGURED',
-        description: 'PostgreSQL connection string is configured.',
-      });
     } catch {
       checks.push({
-        key: 'DATABASE_URL',
+        key: 'FIREBASE_CONFIG',
         category: 'DATABASE',
         status: 'INVALID FORMAT',
-        description: 'Database connection string is not a valid parseable URL.',
-        recommendation: 'Verify the connection string format.',
+        description: 'firebase-applet-config.json is not valid JSON.',
+        recommendation: 'Check JSON syntax in firebase-applet-config.json.',
       });
     }
+  } else {
+    checks.push({
+      key: 'FIREBASE_CONFIG',
+      category: 'DATABASE',
+      status: 'MISSING',
+      description: 'Firebase configuration (firebase-applet-config.json) for Cloud Firestore and Auth.',
+      recommendation: 'Ensure firebase-applet-config.json is present with valid Firebase project details.',
+    });
   }
 
   // 2. SESSION_SECRET
@@ -133,19 +130,19 @@ export function evaluateProductionReadiness(): ProductionReadinessReport {
     });
   }
 
-  // 4. RESEND_FROM_EMAIL
-  const resendFrom = process.env.RESEND_FROM_EMAIL?.trim();
+  // 4. EMAIL_FROM / RESEND_FROM_EMAIL
+  const resendFrom = process.env.EMAIL_FROM?.trim() || process.env.RESEND_FROM_EMAIL?.trim();
   if (!resendFrom) {
     checks.push({
-      key: 'RESEND_FROM_EMAIL',
+      key: 'EMAIL_FROM',
       category: 'EMAIL',
       status: 'MISSING',
       description: 'Verified sender email address for outgoing system emails.',
-      recommendation: 'Configure RESEND_FROM_EMAIL with your verified domain (e.g. Receipto <billing@yourdomain.com>).',
+      recommendation: 'Configure EMAIL_FROM with your verified domain (e.g. Receipto <billing@yourdomain.com>).',
     });
-  } else if (!resendFrom.includes('@') || (!resendFrom.includes('<') && !resendFrom.includes('.'))) {
+  } else if (!resendFrom.includes('@')) {
     checks.push({
-      key: 'RESEND_FROM_EMAIL',
+      key: 'EMAIL_FROM',
       category: 'EMAIL',
       status: 'INVALID FORMAT',
       description: 'Sender email must be a valid email format or Name <email@domain.com>.',
@@ -153,64 +150,60 @@ export function evaluateProductionReadiness(): ProductionReadinessReport {
     });
   } else {
     checks.push({
-      key: 'RESEND_FROM_EMAIL',
+      key: 'EMAIL_FROM',
       category: 'EMAIL',
       status: 'CONFIGURED',
       description: 'Sender email format is valid.',
     });
   }
 
-  // 5. PADDLE_ENV
-  const paddleEnvVal = process.env.PADDLE_ENV?.trim().toLowerCase();
-  if (!paddleEnvVal) {
+  // 5. PADDLE_ENVIRONMENT
+  const paddleEnvVal =
+    process.env.PADDLE_ENVIRONMENT?.trim().toLowerCase() ||
+    process.env.PADDLE_ENV?.trim().toLowerCase() ||
+    'sandbox';
+  if (paddleEnvVal !== 'production' && paddleEnvVal !== 'sandbox' && paddleEnvVal !== 'live') {
     checks.push({
-      key: 'PADDLE_ENV',
-      category: 'PADDLE',
-      status: 'CONFIGURED',
-      description: 'Defaulting to production environment.',
-    });
-  } else if (paddleEnvVal !== 'production' && paddleEnvVal !== 'sandbox' && paddleEnvVal !== 'live') {
-    checks.push({
-      key: 'PADDLE_ENV',
+      key: 'PADDLE_ENVIRONMENT',
       category: 'PADDLE',
       status: 'INVALID FORMAT',
-      description: 'PADDLE_ENV must be either "production" or "sandbox".',
-      recommendation: 'Set PADDLE_ENV="production" for live billing or "sandbox" for test mode.',
+      description: 'PADDLE_ENVIRONMENT must be either "production" or "sandbox".',
+      recommendation: 'Set PADDLE_ENVIRONMENT="production" for live billing or "sandbox" for test mode.',
     });
   } else {
     checks.push({
-      key: 'PADDLE_ENV',
+      key: 'PADDLE_ENVIRONMENT',
       category: 'PADDLE',
       status: 'CONFIGURED',
-      description: `Configured for ${isProduction ? 'Live Production' : 'Developer Sandbox'}.`,
+      description: `Paddle active environment: ${paddleEnvVal}.`,
     });
   }
 
   // 6. PADDLE_CLIENT_TOKEN
   const clientToken = process.env.PADDLE_CLIENT_TOKEN?.trim();
-  const expectedTokenPrefix = isProduction ? 'live_' : 'test_';
+  const tokenPrefix = isProduction ? 'live_' : 'test_';
   if (!clientToken) {
     checks.push({
       key: 'PADDLE_CLIENT_TOKEN',
       category: 'PADDLE',
       status: 'MISSING',
-      description: `Client token for Paddle.js overlay (${expectedTokenPrefix}...).`,
-      recommendation: `Create a client-side token in Paddle Dashboard > Developer Tools > Authentication with prefix ${expectedTokenPrefix}.`,
+      description: 'Public client-side token for initializing the Paddle.js checkout library.',
+      recommendation: `Generate a client-side token in the Paddle Dashboard (${tokenPrefix}...).`,
     });
-  } else if (!clientToken.startsWith(expectedTokenPrefix)) {
+  } else if (!clientToken.startsWith(tokenPrefix)) {
     checks.push({
       key: 'PADDLE_CLIENT_TOKEN',
       category: 'PADDLE',
       status: 'INVALID FORMAT',
-      description: `Token prefix mismatch. ${isProduction ? 'Live requires "live_"' : 'Sandbox requires "test_"'} prefix.`,
-      recommendation: `Ensure token matches ${expectedTokenPrefix} prefix.`,
+      description: `Client token prefix mismatch: expected "${tokenPrefix}" for ${env} environment.`,
+      recommendation: `Provide a client token starting with "${tokenPrefix}" for ${env} mode.`,
     });
   } else {
     checks.push({
       key: 'PADDLE_CLIENT_TOKEN',
       category: 'PADDLE',
       status: 'CONFIGURED',
-      description: `Valid ${isProduction ? 'live' : 'sandbox'} client token configured.`,
+      description: 'Paddle client token format matches active environment.',
     });
   }
 
@@ -221,23 +214,23 @@ export function evaluateProductionReadiness(): ProductionReadinessReport {
       key: 'PADDLE_API_KEY',
       category: 'PADDLE',
       status: 'MISSING',
-      description: 'Server-side API key for Paddle REST endpoints.',
-      recommendation: 'Create an API key in Paddle Dashboard > Developer Tools > Authentication.',
+      description: 'Secret API key for server-to-server Paddle Billing operations.',
+      recommendation: 'Generate an API key in Paddle Dashboard under Developer Tools.',
     });
-  } else if (apiKey.length < 15) {
+  } else if (!apiKey.startsWith('paddlesecret_') && apiKey.length < 20) {
     checks.push({
       key: 'PADDLE_API_KEY',
       category: 'PADDLE',
       status: 'INVALID FORMAT',
-      description: 'Paddle API key appears truncated or invalid.',
-      recommendation: 'Check that the complete API key was copied.',
+      description: 'Paddle API key appears truncated or malformed.',
+      recommendation: 'Copy the full API key from the Paddle developer dashboard.',
     });
   } else {
     checks.push({
       key: 'PADDLE_API_KEY',
       category: 'PADDLE',
       status: 'CONFIGURED',
-      description: 'Server-side Paddle API key is configured.',
+      description: 'Paddle server API key is configured.',
     });
   }
 
@@ -248,107 +241,104 @@ export function evaluateProductionReadiness(): ProductionReadinessReport {
       key: 'PADDLE_WEBHOOK_SECRET',
       category: 'PADDLE',
       status: 'MISSING',
-      description: 'Notification signing secret for Paddle webhook signature verification.',
-      recommendation: 'Create a Notification Destination in Paddle and copy the signing secret.',
+      description: 'Secret signing key for cryptographic verification of Paddle webhook notifications.',
+      recommendation: 'Create a webhook endpoint in Paddle and copy the notification secret key.',
     });
-  } else if (webhookSecret.length < 10) {
+  } else if (!webhookSecret.startsWith('pdl_ntf_set_') && !webhookSecret.startsWith('pdl_') && webhookSecret.length < 15) {
     checks.push({
       key: 'PADDLE_WEBHOOK_SECRET',
       category: 'PADDLE',
       status: 'INVALID FORMAT',
-      description: 'Paddle webhook signing secret is too short.',
-      recommendation: 'Verify the webhook destination signing secret.',
+      description: 'Paddle notification secret format is unrecognized (expected pdl_ntf_set_...).',
+      recommendation: 'Copy the notification secret key directly from the notification destination setting.',
     });
   } else {
     checks.push({
       key: 'PADDLE_WEBHOOK_SECRET',
       category: 'PADDLE',
       status: 'CONFIGURED',
-      description: 'Paddle notification signing secret is configured.',
+      description: 'Paddle webhook signing secret is configured.',
     });
   }
 
-  // Helper for Price IDs
-  function checkPriceId(key: string, label: string) {
-    const val = process.env[key]?.trim();
-    if (!val) {
+  // 9. Plan Price IDs
+  const starterMonthly = process.env.PADDLE_STARTER_MONTHLY_PRICE_ID?.trim();
+  const starterYearly = process.env.PADDLE_STARTER_YEARLY_PRICE_ID?.trim();
+  const growthMonthly = process.env.PADDLE_GROWTH_MONTHLY_PRICE_ID?.trim();
+  const growthYearly = process.env.PADDLE_GROWTH_YEARLY_PRICE_ID?.trim();
+
+  const priceConfigs = [
+    { key: 'PADDLE_STARTER_MONTHLY_PRICE_ID', val: starterMonthly, desc: 'Starter Monthly price' },
+    { key: 'PADDLE_STARTER_YEARLY_PRICE_ID', val: starterYearly, desc: 'Starter Yearly price' },
+    { key: 'PADDLE_GROWTH_MONTHLY_PRICE_ID', val: growthMonthly, desc: 'Growth Monthly price' },
+    { key: 'PADDLE_GROWTH_YEARLY_PRICE_ID', val: growthYearly, desc: 'Growth Yearly price' },
+  ];
+
+  for (const p of priceConfigs) {
+    if (!p.val) {
       checks.push({
-        key,
+        key: p.key,
         category: 'PADDLE',
         status: 'MISSING',
-        description: `Paddle Price ID for ${label} (pri_...).`,
-        recommendation: `Create price in Paddle Live Catalog and set ${key}="pri_...".`,
+        description: `${p.desc} ID from Paddle product catalog.`,
+        recommendation: `Create price for ${p.desc} in Paddle and set ${p.key}=pri_...`,
       });
-    } else if (!val.startsWith('pri_') || val.length < 6) {
+    } else if (!p.val.startsWith('pri_')) {
       checks.push({
-        key,
+        key: p.key,
         category: 'PADDLE',
         status: 'INVALID FORMAT',
-        description: `Price ID for ${label} must begin with "pri_".`,
-        recommendation: `Check price ID from Paddle Catalog. Current value does not have "pri_" prefix.`,
+        description: `${p.key} must begin with "pri_".`,
+        recommendation: `Verify the Price ID from Paddle Catalog (starts with pri_).`,
       });
     } else {
       checks.push({
-        key,
+        key: p.key,
         category: 'PADDLE',
         status: 'CONFIGURED',
-        description: `Valid price ID format configured for ${label}.`,
+        description: `${p.desc} configured.`,
       });
     }
   }
 
-  // 9. PADDLE_STARTER_MONTHLY_PRICE_ID
-  checkPriceId('PADDLE_STARTER_MONTHLY_PRICE_ID', 'Starter Monthly');
-
-  // 10. PADDLE_STARTER_YEARLY_PRICE_ID
-  checkPriceId('PADDLE_STARTER_YEARLY_PRICE_ID', 'Starter Yearly');
-
-  // 11. PADDLE_GROWTH_MONTHLY_PRICE_ID
-  checkPriceId('PADDLE_GROWTH_MONTHLY_PRICE_ID', 'Growth Monthly');
-
-  // 12. PADDLE_GROWTH_YEARLY_PRICE_ID
-  checkPriceId('PADDLE_GROWTH_YEARLY_PRICE_ID', 'Growth Yearly');
-
-  // 13. OWNER_DEMO_EMAIL
+  // 10. OWNER_DEMO_EMAIL
   const ownerEmail = process.env.OWNER_DEMO_EMAIL?.trim();
   if (!ownerEmail) {
     checks.push({
       key: 'OWNER_DEMO_EMAIL',
       category: 'OWNER_DEMO',
       status: 'MISSING',
-      description: 'Authorized email for owner demo testing without real payments.',
+      description: 'Email for owner/founder to test unlocked features.',
       recommendation: 'Set OWNER_DEMO_EMAIL to your personal email to enable owner controls.',
-    });
-  } else if (!ownerEmail.includes('@') || !ownerEmail.includes('.')) {
-    checks.push({
-      key: 'OWNER_DEMO_EMAIL',
-      category: 'OWNER_DEMO',
-      status: 'INVALID FORMAT',
-      description: 'OWNER_DEMO_EMAIL must be a valid email address.',
-      recommendation: 'Provide a valid email address for owner demo access.',
     });
   } else {
     checks.push({
       key: 'OWNER_DEMO_EMAIL',
       category: 'OWNER_DEMO',
       status: 'CONFIGURED',
-      description: 'Owner demo authorized account is configured.',
+      description: `Owner demo controls active for ${ownerEmail}.`,
     });
   }
 
   const configured = checks.filter((c) => c.status === 'CONFIGURED').length;
   const missing = checks.filter((c) => c.status === 'MISSING').length;
-  const invalidFormat = checks.filter((c) => c.status === 'INVALID FORMAT').length;
+  const invalid_format = checks.filter((c) => c.status === 'INVALID FORMAT').length;
+
+  // Essential keys that must be configured and valid for overall_ready: true
+  const requiredKeys = ['FIREBASE_CONFIG', 'SESSION_SECRET'];
+  const overallReady = requiredKeys.every(
+    (k) => checks.find((c) => c.key === k)?.status === 'CONFIGURED'
+  );
 
   return {
-    overall_ready: missing === 0 && invalidFormat === 0,
-    environment: isProduction ? 'production' : 'sandbox',
+    overall_ready: overallReady,
+    environment: env as any,
     timestamp: new Date().toISOString(),
     summary: {
       total: checks.length,
       configured,
       missing,
-      invalid_format: invalidFormat,
+      invalid_format,
     },
     checks,
   };

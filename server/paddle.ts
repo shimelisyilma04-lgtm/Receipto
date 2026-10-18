@@ -33,7 +33,7 @@ export function isPaddleWebhookConfigured(): boolean {
 }
 
 export function getPaddleEnvironment(): 'sandbox' | 'production' {
-  const env = process.env.PADDLE_ENV?.trim().toLowerCase();
+  const env = (process.env.PADDLE_ENVIRONMENT || process.env.PADDLE_ENV)?.trim().toLowerCase();
   if (env === 'sandbox') return 'sandbox';
   if (env === 'production' || env === 'live') return 'production';
   // If client token is provided with live_ prefix, it's production

@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email == 'rshimelis48@gmail.com' && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && isValidId(userId) &&
+                       request.resource.data.id == userId &&
+                       (request.resource.data.role == 'USER' || isAdmin());
+      allow update: if (isOwner(userId) || isAdmin()) &&
+                       request.resource.data.id == resource.data.id &&
+                       (request.resource.data.role == resource.data.role || isAdmin());
+      allow delete: if isOwner(userId) || isAdmin();
+
+      // Clients subcollection
+      match /clients/{clientId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidId(clientId) && request.resource.data.user_id == userId;
+        allow update: if isOwner(userId) && request.resource.data.user_id == userId;
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      // Invoices subcollection
+      match /invoices/{invoiceId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidId(invoiceId) && request.resource.data.user_id == userId;
+        allow update: if isOwner(userId) && request.resource.data.user_id == userId;
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      // Reminders subcollection
+      match /reminders/{reminderId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidId(reminderId) && request.resource.data.user_id == userId;
+        allow update: if isOwner(userId) && request.resource.data.user_id == userId;
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      // Activity logs subcollection
+      match /activity_logs/{logId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && request.resource.data.user_id == userId;
+        allow update: if false;
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      // Subscription subcollection (server/admin controlled)
+      match /subscription/{docId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Processed Webhooks (server-side only)
+    match /processed_webhooks/{webhookId} {
+      allow read, write: if false;
+    }
+  }
+}

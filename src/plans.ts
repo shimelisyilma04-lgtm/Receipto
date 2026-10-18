@@ -17,13 +17,16 @@ export interface PlanFeatures {
   customReminderSchedules: boolean;
   csvExport: boolean;
   fullActivityHistory: boolean;
-  professionalPrinting: boolean;
+  professionalPrinting?: boolean;
   prioritySupport: boolean;
+  activityHistoryDays?: number;
+  customEmailTemplates?: boolean;
 }
 
 export interface PlanConfig {
   tier: PlanTier;
   name: string;
+  displayName?: string;
   badge: string;
   tagline: string;
   priceMonthly: number;

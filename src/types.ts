@@ -34,20 +34,29 @@ export interface SubscriptionUsage {
   period_start: string;
   period_end: string | null;
   automated_reminders_count: number;
+  client_limit_reached?: boolean;
+  invoice_limit_reached?: boolean;
+  invoice_count?: number;
+  plan?: import('./plans.js').PlanTier;
+  automated_reminders_enabled?: boolean;
+  csv_export_enabled?: boolean;
+  full_activity_history?: boolean;
 }
 
 export interface SubscriptionDetails {
   subscription: Subscription;
   plan_config: import('./plans.js').PlanConfig;
   usage: SubscriptionUsage;
-  is_active: boolean;
-  is_owner_demo: boolean;
-  access_mode: import('./plans.js').AccessMode;
-  billing_provider: import('./plans.js').SubscriptionProvider;
+  is_active?: boolean;
+  is_owner_demo?: boolean;
+  access_mode?: import('./plans.js').AccessMode;
+  billing_provider?: import('./plans.js').SubscriptionProvider;
   owner_demo_available_plans?: import('./plans.js').PlanTier[];
-  paddle_configured: boolean;
+  paddle_configured?: boolean;
   paddle_env?: string;
   paddle_client_token?: string;
+  success?: boolean;
+  message?: string;
 }
 
 export interface User {
@@ -63,10 +72,12 @@ export interface User {
   last_login_at?: string | null;
   paddle_customer_id?: string | null;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Client {
   id: string;
+  user_id?: string;
   name: string;
   email: string;
   phone?: string;
@@ -123,6 +134,7 @@ export interface Reminder {
 
 export interface ActivityLog {
   id: string;
+  user_id?: string;
   action: string;
   details: string;
   metadata?: Record<string, any>;
@@ -143,6 +155,7 @@ export interface DashboardStats {
   client_count: number;
   urgent_invoices: Invoice[];
   recent_activity: ActivityLog[];
+  upcoming_due_invoices?: any[];
 }
 
 export interface SystemConfig {

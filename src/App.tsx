@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import type { TabType, User, Client, Invoice, DashboardStats, SubscriptionDetails } from './types.js';
 import { api } from './api.js';
+import { auth, onAuthStateChanged } from './firebase.js';
 import { Navbar } from './components/Navbar.js';
 import { DashboardView } from './components/DashboardView.js';
 import { InvoicesView } from './components/InvoicesView.js';
@@ -101,9 +102,18 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }
 
-  // Check auth on load
+  // Listen to Firebase auth state changes
   useEffect(() => {
-    checkAuth();
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        checkAuth();
+      } else {
+        setCurrentUser(null);
+        setUnverifiedState(null);
+        setAuthLoading(false);
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   // Listen to browser forward/back buttons for legal pages

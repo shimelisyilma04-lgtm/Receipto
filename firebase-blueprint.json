@@ -1,0 +1,177 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile and preferences",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "name": { "type": "string", "maxLength": 128 },
+        "business_name": { "type": "string", "maxLength": 128 },
+        "email_verified": { "type": "boolean" },
+        "role": { "type": "string", "enum": ["USER", "ADMIN"] },
+        "status": { "type": "string", "enum": ["ACTIVE", "SUSPENDED"] },
+        "terms_accepted_at": { "type": "string" },
+        "terms_version": { "type": "string", "maxLength": 32 },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["id", "email", "name"]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Client record linked to an account owner",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "user_id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "phone": { "type": "string", "maxLength": 64 },
+        "company": { "type": "string", "maxLength": 128 },
+        "address": { "type": "string", "maxLength": 512 },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["id", "user_id", "name", "email"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Invoice tracked in Receipto",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "user_id": { "type": "string", "maxLength": 128 },
+        "client_id": { "type": "string", "maxLength": 128 },
+        "client_name": { "type": "string", "maxLength": 128 },
+        "client_email": { "type": "string", "maxLength": 256 },
+        "client_company": { "type": "string", "maxLength": 128 },
+        "invoice_number": { "type": "string", "maxLength": 64 },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 8 },
+        "issue_date": { "type": "string", "maxLength": 32 },
+        "due_date": { "type": "string", "maxLength": 32 },
+        "payment_status": { "type": "string", "enum": ["UNPAID", "PAID", "OVERDUE", "CANCELLED"] },
+        "paid_date": { "type": "string" },
+        "notes": { "type": "string", "maxLength": 2048 },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["id", "user_id", "client_id", "invoice_number", "amount", "issue_date", "due_date", "payment_status"]
+    },
+    "Reminder": {
+      "title": "Reminder",
+      "description": "Payment reminder record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "user_id": { "type": "string", "maxLength": 128 },
+        "invoice_id": { "type": "string", "maxLength": 128 },
+        "client_id": { "type": "string", "maxLength": 128 },
+        "recipient_email": { "type": "string", "maxLength": 256 },
+        "subject": { "type": "string", "maxLength": 256 },
+        "message": { "type": "string", "maxLength": 4096 },
+        "sent_at": { "type": "string" },
+        "status": { "type": "string", "enum": ["SENT", "CONFIG_REQUIRED", "FAILED", "SCHEDULED"] },
+        "error_message": { "type": "string", "maxLength": 512 },
+        "reminder_type": { "type": "string", "maxLength": 32 },
+        "scheduled_at": { "type": "string" },
+        "attempt_count": { "type": "number" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id", "user_id", "invoice_id", "client_id", "recipient_email", "subject", "message", "status"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Audit trail log event for account operations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "user_id": { "type": "string", "maxLength": 128 },
+        "action": { "type": "string", "maxLength": 128 },
+        "details": { "type": "string", "maxLength": 1024 },
+        "metadata": { "type": "string", "maxLength": 2048 },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id", "user_id", "action", "details"]
+    },
+    "UserSubscription": {
+      "title": "UserSubscription",
+      "description": "Subscription tier and billing status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "user_id": { "type": "string", "maxLength": 128 },
+        "plan": { "type": "string", "enum": ["FREE", "STARTER", "GROWTH"] },
+        "status": { "type": "string", "enum": ["active", "trialing", "past_due", "canceled", "paused"] },
+        "billing_interval": { "type": "string", "enum": ["monthly", "annual"] },
+        "provider": { "type": "string", "enum": ["manual", "paddle"] },
+        "paddle_customer_id": { "type": "string", "maxLength": 128 },
+        "paddle_subscription_id": { "type": "string", "maxLength": 128 },
+        "current_period_start": { "type": "string" },
+        "current_period_end": { "type": "string" },
+        "cancel_at_period_end": { "type": "boolean" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["id", "user_id", "plan", "status", "billing_interval", "provider"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Privileged administrator identifiers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "role": { "type": "string", "enum": ["ADMIN"] },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id", "email", "role"]
+    },
+    "ProcessedWebhook": {
+      "title": "ProcessedWebhook",
+      "description": "Payment webhook event tracking for idempotency",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "event_type": { "type": "string", "maxLength": 128 },
+        "processed_at": { "type": "string" }
+      },
+      "required": ["id", "event_type", "processed_at"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile and account settings"
+    },
+    "/users/{userId}/clients/{clientId}": {
+      "schema": "Client",
+      "description": "User client directory"
+    },
+    "/users/{userId}/invoices/{invoiceId}": {
+      "schema": "Invoice",
+      "description": "Invoices created by the user"
+    },
+    "/users/{userId}/reminders/{reminderId}": {
+      "schema": "Reminder",
+      "description": "Payment reminder dispatches and schedules"
+    },
+    "/users/{userId}/activity_logs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "Audit trail and activity log entries"
+    },
+    "/users/{userId}/subscription/details": {
+      "schema": "UserSubscription",
+      "description": "Current subscription tier and billing state"
+    },
+    "/admins/{adminId}": {
+      "schema": "AdminRecord",
+      "description": "Authorized administrator user IDs"
+    },
+    "/processed_webhooks/{webhookId}": {
+      "schema": "ProcessedWebhook",
+      "description": "Processed webhook idempotency records"
+    }
+  }
+}
