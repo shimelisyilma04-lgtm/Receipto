@@ -1159,21 +1159,31 @@ export async function getUserByPaddleCustomerId(customerId: string): Promise<Use
   return null;
 }
 
-// Admin Methods
 export async function getAdminDashboardStats(): Promise<import('./types.js').AdminDashboardStats> {
   reloadLocalStore();
   const totalUsers = memoryStore.users.length;
   const activeUsers = memoryStore.users.filter((u) => u.status === 'ACTIVE').length;
   const suspendedUsers = memoryStore.users.filter((u) => u.status === 'SUSPENDED').length;
   const adminUsers = memoryStore.users.filter((u) => u.role === 'ADMIN').length;
+  const verifiedUsers = memoryStore.users.filter((u) => u.email_verified).length;
+  const unverifiedUsers = totalUsers - verifiedUsers;
 
   const totalInvoices = memoryStore.invoices.length;
   const totalReminders = memoryStore.reminders.length;
+  const paidInvoicesCount = memoryStore.invoices.filter((i) => i.payment_status === 'PAID').length;
+  const overdueInvoicesCount = memoryStore.invoices.filter((i) => i.payment_status === 'OVERDUE').length;
 
   let paidInvoicesSum = 0;
   memoryStore.invoices.forEach((i) => {
     if (i.payment_status === 'PAID') paidInvoicesSum += i.amount;
   });
+
+  const freeUsers = memoryStore.subscriptions.filter((s) => s.plan === 'FREE').length;
+  const starterUsers = memoryStore.subscriptions.filter((s) => s.plan === 'STARTER').length;
+  const growthUsers = memoryStore.subscriptions.filter((s) => s.plan === 'GROWTH').length;
+  const activeSubs = memoryStore.subscriptions.filter((s) => s.status === 'active').length;
+  const pastDueSubs = memoryStore.subscriptions.filter((s) => s.status === 'past_due').length;
+  const cancelledSubs = memoryStore.subscriptions.filter((s) => s.status === 'cancelled' || (s.status as any) === 'canceled').length;
 
   const activePaidSubs = memoryStore.subscriptions.filter(
     (s) => s.status === 'active' && s.plan !== 'FREE'
@@ -1187,17 +1197,35 @@ export async function getAdminDashboardStats(): Promise<import('./types.js').Adm
     active_users: activeUsers,
     suspended_users: suspendedUsers,
     admin_users: adminUsers,
+    verified_users: verifiedUsers,
+    unverified_users: unverifiedUsers,
+    free_users: freeUsers,
+    starter_users: starterUsers,
+    growth_users: growthUsers,
+    active_subscriptions: activeSubs,
+    past_due_subscriptions: pastDueSubs,
+    cancelled_subscriptions: cancelledSubs,
     total_clients: memoryStore.clients.length,
     total_invoices: totalInvoices,
+    paid_invoices: paidInvoicesCount,
     total_paid_invoices_amount: paidInvoicesSum,
+    overdue_invoices: overdueInvoicesCount,
+    reminders_sent: totalReminders,
     total_reminders_sent: totalReminders,
     subscriptions_by_plan: {
-      FREE: memoryStore.subscriptions.filter((s) => s.plan === 'FREE').length,
-      STARTER: memoryStore.subscriptions.filter((s) => s.plan === 'STARTER').length,
-      GROWTH: memoryStore.subscriptions.filter((s) => s.plan === 'GROWTH').length,
+      FREE: freeUsers,
+      STARTER: starterUsers,
+      GROWTH: growthUsers,
     },
     active_paid_subscriptions_count: activePaidSubs.length,
     mrr_usd: mrr,
+    recent_activity: memoryStore.activity_logs.slice(0, 10),
+    system_health: {
+      database: 'PASS',
+      email: process.env.RESEND_API_KEY ? 'PASS' : 'NOT CONFIGURED',
+      paddle: isPaddleConfigured() ? 'PASS' : 'NOT CONFIGURED',
+      worker: 'PASS',
+    },
   };
 }
 

@@ -8,7 +8,7 @@ interface ContactSupportModalProps {
   userEmail?: string;
 }
 
-export const RECEIPTO_SUPPORT_EMAIL = 'shimelisyilma04@gmail.com';
+export const RECEIPTO_SUPPORT_EMAIL = 'receiptobusiness@gmail.com';
 
 export function ContactSupportModal({ isOpen, onClose, userEmail }: ContactSupportModalProps) {
   const [copied, setCopied] = useState(false);

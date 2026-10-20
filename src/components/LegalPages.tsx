@@ -181,8 +181,8 @@ export function LegalPages({ initialTab = 'terms', onBackToHome }: LegalPagesPro
                 <Mail className="w-5 h-5 text-indigo-400 shrink-0" />
                 <div>
                   <div className="font-semibold text-white">Receipto Customer Support</div>
-                  <a href="mailto:shimelisyilma04@gmail.com" className="text-indigo-400 hover:underline">
-                    shimelisyilma04@gmail.com
+                  <a href="mailto:receiptobusiness@gmail.com" className="text-indigo-400 hover:underline">
+                    receiptobusiness@gmail.com
                   </a>
                 </div>
               </div>
@@ -240,8 +240,7 @@ export function LegalPages({ initialTab = 'terms', onBackToHome }: LegalPagesPro
             <section className="space-y-3">
               <h2 className="text-lg font-bold text-white">4. Data Security &amp; Encryption</h2>
               <p>
-                All data transmitted between your browser and our servers is encrypted using Transport Layer Security (TLS 1.3).
-                Sensitive records are stored in PostgreSQL with strict role-based access control, cryptographic password hashing,
+                Sensitive records are stored in Google Cloud Firestore with strict zero-trust security rules, cryptographic password hashing,
                 and hardened API authentication tokens.
               </p>
             </section>
@@ -263,8 +262,8 @@ export function LegalPages({ initialTab = 'terms', onBackToHome }: LegalPagesPro
                 <Mail className="w-5 h-5 text-indigo-400 shrink-0" />
                 <div>
                   <div className="font-semibold text-white">Receipto Privacy &amp; Data Protection</div>
-                  <a href="mailto:shimelisyilma04@gmail.com" className="text-indigo-400 hover:underline">
-                    shimelisyilma04@gmail.com
+                  <a href="mailto:receiptobusiness@gmail.com" className="text-indigo-400 hover:underline">
+                    receiptobusiness@gmail.com
                   </a>
                 </div>
               </div>
@@ -298,8 +297,8 @@ export function LegalPages({ initialTab = 'terms', onBackToHome }: LegalPagesPro
                   </div>
                   <p className="text-xs text-slate-400">
                     Email us at{' '}
-                    <a href="mailto:shimelisyilma04@gmail.com" className="text-indigo-400 underline">
-                      shimelisyilma04@gmail.com
+                    <a href="mailto:receiptobusiness@gmail.com" className="text-indigo-400 underline">
+                      receiptobusiness@gmail.com
                     </a>{' '}
                     with your registered email address or Paddle Order ID. We will promptly process your refund through Paddle within 1 business day.
                   </p>
@@ -348,8 +347,8 @@ export function LegalPages({ initialTab = 'terms', onBackToHome }: LegalPagesPro
               <h2 className="text-lg font-bold text-white">4. Chargebacks and Inquiries</h2>
               <p>
                 If you ever see an unrecognized charge or have a billing discrepancy, please contact us at{' '}
-                <a href="mailto:shimelisyilma04@gmail.com" className="text-indigo-400 hover:underline">
-                  shimelisyilma04@gmail.com
+                <a href="mailto:receiptobusiness@gmail.com" className="text-indigo-400 hover:underline">
+                  receiptobusiness@gmail.com
                 </a>{' '}
                 first before initiating a bank dispute. We are committed to resolving billing inquiries immediately.
               </p>

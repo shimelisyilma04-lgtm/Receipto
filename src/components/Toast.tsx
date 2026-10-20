@@ -22,12 +22,12 @@ export function ToastContainer({ toasts, onDismiss }: ToastProps) {
           key={toast.id}
           className={`pointer-events-auto flex items-start gap-3 p-4 rounded-xl shadow-lg border text-sm transition-all duration-300 transform translate-y-0 ${
             toast.type === 'success'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+              ? 'bg-emerald-50 dark:bg-emerald-950/90 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-100'
               : toast.type === 'error'
-              ? 'bg-rose-50 border-rose-200 text-rose-900'
+              ? 'bg-rose-50 dark:bg-rose-950/90 border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-100'
               : toast.type === 'warning'
-              ? 'bg-amber-50 border-amber-200 text-amber-900'
-              : 'bg-slate-50 border-slate-200 text-slate-900'
+              ? 'bg-amber-50 dark:bg-amber-950/90 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100'
+              : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100'
           }`}
         >
           {toast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />}

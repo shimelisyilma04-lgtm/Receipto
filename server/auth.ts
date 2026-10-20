@@ -104,7 +104,7 @@ export interface AuthenticatedRequest extends Request {
 }
 
 function sendAuthError(req: AuthenticatedRequest, res: Response, status: number, errorMsg: string) {
-  const isPrintRequest = req.path.endsWith('/print') || (req.accepts('html') && !req.xhr && !req.headers.accept?.includes('application/json'));
+  const isPrintRequest = req.path.endsWith('/print');
   if (isPrintRequest) {
     return res.status(status).setHeader('Content-Type', 'text/html; charset=utf-8').send(`<!DOCTYPE html>
 <html lang="en">

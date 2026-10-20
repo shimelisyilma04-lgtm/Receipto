@@ -227,6 +227,10 @@ async function runAllTests() {
     logFail('Get clients endpoint', err.message);
   }
 
+  const futureDueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const pastDueDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const issueDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
   // 9. Invoice Creation (Future Due Date: UNPAID)
   try {
     const res = await apiRequest('/api/invoices', {
@@ -236,8 +240,8 @@ async function runAllTests() {
         invoice_number: `INV-${runId}-001`,
         amount: 2500.00,
         currency: 'USD',
-        issue_date: '2026-09-01',
-        due_date: '2026-10-15',
+        issue_date: issueDate,
+        due_date: futureDueDate,
         notes: 'Consulting services for Q3 automation',
       },
     }, user1Cookie);
@@ -261,8 +265,8 @@ async function runAllTests() {
         invoice_number: `INV-${runId}-001`,
         amount: 500.00,
         currency: 'USD',
-        issue_date: '2026-09-01',
-        due_date: '2026-10-15',
+        issue_date: issueDate,
+        due_date: futureDueDate,
       },
     }, user1Cookie);
 
@@ -284,8 +288,8 @@ async function runAllTests() {
         invoice_number: `INV-${runId}-OVERDUE`,
         amount: 1200.00,
         currency: 'USD',
-        issue_date: '2026-08-01',
-        due_date: '2026-08-15', // Past due!
+        issue_date: issueDate,
+        due_date: pastDueDate, // Past due!
         notes: 'Past due security review',
       },
     }, user1Cookie);

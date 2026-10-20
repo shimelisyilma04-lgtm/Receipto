@@ -104,7 +104,13 @@ export default function App() {
 
   // Listen to Firebase auth state changes
   useEffect(() => {
+    // Safety fallback: if auth hasn't resolved within 2 seconds, unblock landing page
+    const safetyTimer = setTimeout(() => {
+      setAuthLoading(false);
+    }, 2000);
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      clearTimeout(safetyTimer);
       if (firebaseUser) {
         checkAuth();
       } else {
@@ -113,7 +119,10 @@ export default function App() {
         setAuthLoading(false);
       }
     });
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(safetyTimer);
+      unsubscribe();
+    };
   }, []);
 
   // Listen to browser forward/back buttons for legal pages
@@ -213,6 +222,10 @@ export default function App() {
     setCurrentUser(null);
     setUnverifiedState(null);
     setAuthModalMode(null);
+    setClients([]);
+    setInvoices([]);
+    setStats(null);
+    setSubscriptionDetails(null);
     showToast('Logged out of Receipto.', 'info');
   }
 

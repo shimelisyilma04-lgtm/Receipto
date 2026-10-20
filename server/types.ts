@@ -245,7 +245,7 @@ export interface AdminSubscriptionItem {
 export interface AdminSystemHealth {
   database: {
     status: 'PASS' | 'FAIL';
-    engine: 'firestore' | 'postgres' | 'local_persistent';
+    engine: 'firestore';
     connected: boolean;
     latency_ms?: number;
     details?: string;

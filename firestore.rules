@@ -19,6 +19,7 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email == 'receiptobusiness@gmail.com' && request.auth.token.email_verified == true) ||
         (request.auth.token.email == 'rshimelis48@gmail.com' && request.auth.token.email_verified == true)
       );
     }
@@ -74,19 +75,27 @@ service cloud.firestore {
       // Subscription subcollection (server/admin controlled)
       match /subscription/{docId} {
         allow read: if isOwner(userId) || isAdmin();
-        allow write: if isOwner(userId) || isAdmin();
+        // Users can initialize their default FREE subscription, but cannot upgrade or change status without server/admin
+        allow create: if (isOwner(userId) && request.resource.data.plan == 'FREE') || isAdmin();
+        allow update: if isAdmin();
+        allow delete: if isAdmin();
       }
     }
 
-    // Admins Collection
+    // Admins Collection - strictly restricted to administrators
     match /admins/{adminId} {
-      allow read: if isSignedIn();
+      allow read: if isAdmin();
       allow write: if isAdmin();
     }
 
     // Processed Webhooks (server-side only)
     match /processed_webhooks/{webhookId} {
       allow read, write: if false;
+    }
+
+    // Connection test document ping
+    match /test/connection {
+      allow read: if true;
     }
   }
 }

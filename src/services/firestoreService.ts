@@ -1,5 +1,6 @@
 import {
   db,
+  auth,
   doc,
   collection,
   getDoc,
@@ -23,6 +24,7 @@ import type {
   SubscriptionDetails,
   PaymentStatus,
 } from '../types.js';
+import { PLAN_CONFIGS, getEffectivePlan } from '../plans.js';
 
 // Calculate invoice payment status based on due date
 export function computeInvoiceStatus(invoice: Partial<Invoice>, todayStr?: string): PaymentStatus {
@@ -34,6 +36,31 @@ export function computeInvoiceStatus(invoice: Partial<Invoice>, todayStr?: strin
     return 'OVERDUE';
   }
   return 'UNPAID';
+}
+
+/**
+ * Recursively strips undefined properties from data before sending to Firestore.
+ * Firestore throws 'Unsupported field value: undefined' if any property is undefined.
+ */
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return data
+      .filter((item) => item !== undefined)
+      .map((item) => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (typeof data === 'object' && !(data instanceof Date)) {
+    const sanitized: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data as Record<string, any>)) {
+      if (value !== undefined) {
+        sanitized[key] = sanitizeForFirestore(value);
+      }
+    }
+    return sanitized as T;
+  }
+  return data;
 }
 
 // ============================================================================
@@ -54,10 +81,18 @@ export async function setFirestoreUserProfile(uid: string, profile: Partial<User
   const path = `users/${uid}`;
   try {
     const ref = doc(db, 'users', uid);
-    const existing = await getDoc(ref);
+    let existingDoc: any = null;
+    try {
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        existingDoc = snap.data();
+      }
+    } catch {
+      // Document might not exist yet or connection is resolving
+    }
     const now = new Date().toISOString();
 
-    const userData: User = {
+    const userData: any = {
       id: uid,
       email: profile.email || '',
       name: profile.name || 'User',
@@ -68,13 +103,19 @@ export async function setFirestoreUserProfile(uid: string, profile: Partial<User
       terms_accepted_at: profile.terms_accepted_at || now,
       terms_version: profile.terms_version || '1.0',
       last_login_at: now,
-      created_at: existing.exists() ? (existing.data().created_at || now) : now,
+      created_at: existingDoc?.created_at || now,
       updated_at: now,
-      paddle_customer_id: profile.paddle_customer_id,
     };
 
-    await setDoc(ref, userData, { merge: true });
-    return userData;
+    if (profile.paddle_customer_id !== undefined && profile.paddle_customer_id !== null) {
+      userData.paddle_customer_id = profile.paddle_customer_id;
+    } else if (existingDoc?.paddle_customer_id) {
+      userData.paddle_customer_id = existingDoc.paddle_customer_id;
+    }
+
+    const sanitizedData = sanitizeForFirestore(userData);
+    await setDoc(ref, sanitizedData, { merge: true });
+    return userData as User;
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, path);
   }
@@ -88,11 +129,15 @@ export async function updateFirestoreUserProfile(
   try {
     const ref = doc(db, 'users', uid);
     const now = new Date().toISOString();
-    const dataToUpdate = {
-      ...updates,
+    const dataToUpdate: Record<string, any> = {
       updated_at: now,
     };
-    await updateDoc(ref, dataToUpdate);
+    for (const [k, v] of Object.entries(updates)) {
+      if (v !== undefined) {
+        dataToUpdate[k] = v;
+      }
+    }
+    await updateDoc(ref, sanitizeForFirestore(dataToUpdate));
     const updatedSnap = await getDoc(ref);
     return updatedSnap.data() as User;
   } catch (err) {
@@ -150,7 +195,7 @@ export async function createFirestoreClient(
   };
 
   try {
-    await setDoc(doc(db, 'users', uid, 'clients', clientId), newClient);
+    await setDoc(doc(db, 'users', uid, 'clients', clientId), sanitizeForFirestore(newClient));
     await logFirestoreActivity(uid, 'CREATE_CLIENT', `Created client ${newClient.name}`);
     return newClient;
   } catch (err) {
@@ -175,7 +220,7 @@ export async function updateFirestoreClient(
     if (data.company !== undefined) updatePayload.company = data.company.trim();
     if (data.address !== undefined) updatePayload.address = data.address.trim();
 
-    await updateDoc(ref, updatePayload);
+    await updateDoc(ref, sanitizeForFirestore(updatePayload));
     const snap = await getDoc(ref);
     const updated = snap.data() as Client;
     await logFirestoreActivity(uid, 'UPDATE_CLIENT', `Updated details for client ${updated.name}`);
@@ -300,7 +345,7 @@ export async function createFirestoreInvoice(
   };
 
   try {
-    await setDoc(doc(db, 'users', uid, 'invoices', invoiceId), newInvoice);
+    await setDoc(doc(db, 'users', uid, 'invoices', invoiceId), sanitizeForFirestore(newInvoice));
     await logFirestoreActivity(
       uid,
       'CREATE_INVOICE',
@@ -356,7 +401,7 @@ export async function updateFirestoreInvoice(
     }
     if (data.notes !== undefined) updatePayload.notes = data.notes.trim();
 
-    await updateDoc(ref, updatePayload);
+    await updateDoc(ref, sanitizeForFirestore(updatePayload));
     const snap = await getDoc(ref);
     const updated = snap.data() as Invoice;
     await logFirestoreActivity(uid, 'UPDATE_INVOICE', `Updated invoice #${updated.invoice_number}`);
@@ -376,7 +421,7 @@ export async function markFirestoreInvoicePaid(uid: string, invoiceId: string, p
       paid_date: paidDate || now,
       updated_at: now,
     };
-    await updateDoc(ref, updateData);
+    await updateDoc(ref, sanitizeForFirestore(updateData));
     const snap = await getDoc(ref);
     const updated = snap.data() as Invoice;
     await logFirestoreActivity(uid, 'PAY_INVOICE', `Marked invoice #${updated.invoice_number} as PAID`);
@@ -391,10 +436,10 @@ export async function cancelFirestoreInvoice(uid: string, invoiceId: string): Pr
   try {
     const ref = doc(db, 'users', uid, 'invoices', invoiceId);
     const now = new Date().toISOString();
-    await updateDoc(ref, {
+    await updateDoc(ref, sanitizeForFirestore({
       payment_status: 'CANCELLED',
       updated_at: now,
-    });
+    }));
     const snap = await getDoc(ref);
     const updated = snap.data() as Invoice;
     await logFirestoreActivity(uid, 'CANCEL_INVOICE', `Cancelled invoice #${updated.invoice_number}`);
@@ -452,7 +497,7 @@ export async function createFirestoreReminder(uid: string, reminder: Omit<Remind
   };
 
   try {
-    await setDoc(doc(db, 'users', uid, 'reminders', reminderId), newReminder);
+    await setDoc(doc(db, 'users', uid, 'reminders', reminderId), sanitizeForFirestore(newReminder));
     await logFirestoreActivity(uid, 'SEND_REMINDER', `Dispatched payment reminder to ${newReminder.recipient_email}`);
     return newReminder;
   } catch (err) {
@@ -466,17 +511,19 @@ export async function createFirestoreReminder(uid: string, reminder: Omit<Remind
 export async function logFirestoreActivity(uid: string, action: string, details: string, metadata?: any): Promise<void> {
   const logId = crypto.randomUUID();
   const path = `users/${uid}/activity_logs/${logId}`;
-  const logEntry: ActivityLog = {
+  const logEntry: any = {
     id: logId,
     user_id: uid,
     action,
     details,
-    metadata,
     created_at: new Date().toISOString(),
   };
+  if (metadata !== undefined) {
+    logEntry.metadata = metadata;
+  }
 
   try {
-    await setDoc(doc(db, 'users', uid, 'activity_logs', logId), logEntry);
+    await setDoc(doc(db, 'users', uid, 'activity_logs', logId), sanitizeForFirestore(logEntry));
   } catch (err) {
     console.warn(`Failed to log activity event: ${err}`);
   }
@@ -518,10 +565,12 @@ export async function getFirestoreSubscription(uid: string): Promise<Subscriptio
     const activePlan = snap.exists() ? (snap.data().plan || 'FREE') : 'FREE';
     const activeStatus = snap.exists() ? (snap.data().status || 'active') : 'active';
     const interval = snap.exists() ? (snap.data().billing_interval || 'monthly') : 'monthly';
-
-    // Tier configurations
-    const maxClients = activePlan === 'FREE' ? 5 : activePlan === 'STARTER' ? 50 : null;
-    const maxInvoices = activePlan === 'FREE' ? 10 : activePlan === 'STARTER' ? 100 : null;
+    const now = new Date().toISOString();
+    const periodStart = snap.exists() ? (snap.data().current_period_start || now) : now;
+    const periodEnd = snap.exists() ? (snap.data().current_period_end || null) : null;
+    const planConfig = getEffectivePlan(activePlan, activeStatus, periodEnd);
+    const maxClients = planConfig.limits.maxClients;
+    const maxInvoices = planConfig.limits.maxInvoicesPerMonth;
 
     return {
       subscription: snap.exists()
@@ -533,38 +582,39 @@ export async function getFirestoreSubscription(uid: string): Promise<Subscriptio
             status: 'active',
             billing_interval: 'monthly',
             provider: 'manual',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            provider_customer_id: null,
+            provider_subscription_id: null,
+            current_period_start: now,
+            current_period_end: null,
+            cancel_at_period_end: false,
+            created_at: now,
+            updated_at: now,
           },
       usage: {
         plan: activePlan,
         client_count: clients.length,
         max_clients: maxClients,
+        clients_remaining: maxClients !== null ? Math.max(0, maxClients - clients.length) : null,
         client_limit_reached: maxClients !== null && clients.length >= maxClients,
         invoice_count: invoices.length,
+        invoices_this_period: invoices.length,
         max_invoices_per_month: maxInvoices,
+        invoices_remaining: maxInvoices !== null ? Math.max(0, maxInvoices - invoices.length) : null,
         invoice_limit_reached: maxInvoices !== null && invoices.length >= maxInvoices,
-        automated_reminders_enabled: activePlan !== 'FREE',
-        csv_export_enabled: activePlan !== 'FREE',
-        full_activity_history: activePlan === 'GROWTH',
+        period_start: periodStart,
+        period_end: periodEnd,
+        automated_reminders_count: 0,
+        automated_reminders_enabled: planConfig.features.automatedReminders,
+        csv_export_enabled: planConfig.features.csvExport,
+        full_activity_history: planConfig.features.fullActivityHistory,
       },
-      plan_config: {
-        tier: activePlan,
-        displayName: activePlan === 'GROWTH' ? 'Growth Plan' : activePlan === 'STARTER' ? 'Starter Plan' : 'Free Tier',
-        priceMonthly: activePlan === 'GROWTH' ? 49 : activePlan === 'STARTER' ? 19 : 0,
-        priceAnnual: activePlan === 'GROWTH' ? 470 : activePlan === 'STARTER' ? 190 : 0,
-        limits: {
-          maxClients,
-          maxInvoicesPerMonth: maxInvoices,
-        },
-        features: {
-          automatedReminders: activePlan !== 'FREE',
-          csvExport: activePlan !== 'FREE',
-          activityHistoryDays: activePlan === 'GROWTH' ? 365 : activePlan === 'STARTER' ? 30 : 7,
-          customEmailTemplates: activePlan === 'GROWTH',
-          prioritySupport: activePlan === 'GROWTH',
-        },
-      },
+      plan_config: planConfig,
+      is_active: activeStatus === 'active',
+      is_owner_demo: auth.currentUser?.email?.trim().toLowerCase() === 'receiptobusiness@gmail.com' || auth.currentUser?.email?.trim().toLowerCase() === 'rshimelis48@gmail.com',
+      owner_demo_available_plans: ['FREE', 'STARTER', 'GROWTH'],
+      access_mode: (auth.currentUser?.email?.trim().toLowerCase() === 'receiptobusiness@gmail.com' || auth.currentUser?.email?.trim().toLowerCase() === 'rshimelis48@gmail.com') ? 'owner_demo' : 'free',
+      billing_provider: 'manual',
+      paddle_configured: true,
     };
   } catch (err) {
     handleFirestoreError(err, OperationType.GET, path);
@@ -601,7 +651,7 @@ export async function setFirestoreSubscription(
       updated_at: now,
     };
 
-    await setDoc(ref, subData, { merge: true });
+    await setDoc(ref, sanitizeForFirestore(subData), { merge: true });
     await logFirestoreActivity(uid, 'UPDATE_SUBSCRIPTION', `Subscription updated to ${data.plan}`);
     return await getFirestoreSubscription(uid);
   } catch (err) {

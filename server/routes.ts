@@ -2059,7 +2059,12 @@ router.get('/billing/subscription', requireAuth, async (req: AuthenticatedReques
   try {
     const userId = req.user!.id;
     const details = await getSubscriptionDetails(userId);
-    res.status(200).json(details);
+    const isOwner = isOwnerAccount(req.user);
+    res.status(200).json({
+      ...details,
+      is_owner_demo: isOwner,
+      owner_demo_available_plans: isOwner ? ['FREE', 'STARTER', 'GROWTH'] : undefined,
+    });
   } catch (err: any) {
     console.error('[Get Subscription Error]', err);
     res.status(500).json({ error: 'Failed to fetch subscription details.' });

@@ -70,19 +70,19 @@ export function SendReminderModal({ invoice, onClose, onSuccess, onError }: Send
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl overflow-hidden text-slate-900 dark:text-white transition-colors">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 flex items-center justify-center">
               <Mail className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="font-bold text-slate-900 text-base">Payment Reminder Generator</h2>
-              <p className="text-xs text-slate-500">Invoice #{invoice.invoice_number} â€¢ {invoice.client_name}</p>
+              <h2 className="font-bold text-slate-900 dark:text-white text-base">Payment Reminder Generator</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Invoice #{invoice.invoice_number} &bull; {invoice.client_name}</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -90,16 +90,16 @@ export function SendReminderModal({ invoice, onClose, onSuccess, onError }: Send
         <div className="p-6 space-y-5">
           {/* Email configuration banner */}
           {isEmailConfigured ? (
-            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-medium">
-              <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 text-xs font-medium">
+              <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>Resend live email delivery is configured. Reminder will be dispatched to <strong>{invoice.client_email}</strong>.</span>
             </div>
           ) : (
-            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs">
-              <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs">
+              <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <div>
                 <span className="font-semibold">Email Service Not Configured (RESEND_API_KEY unset):</span>
-                <p className="text-amber-800 mt-0.5">
+                <p className="text-amber-800 dark:text-amber-300 mt-0.5">
                   The reminder will be generated, previewed, and logged to your audit history. You can also copy the draft below to send via your own email client.
                 </p>
               </div>
@@ -108,7 +108,7 @@ export function SendReminderModal({ invoice, onClose, onSuccess, onError }: Send
 
           {/* Tone Selector */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
               Communication Tone
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -117,40 +117,40 @@ export function SendReminderModal({ invoice, onClose, onSuccess, onError }: Send
                 onClick={() => setTone('friendly')}
                 className={`py-2 px-3 rounded-xl text-xs font-semibold border transition ${
                   tone === 'friendly'
-                    ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-xs'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-xs'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
                 }`}
               >
-                ðŸ˜Š Friendly Gentle
+                😊 Friendly Gentle
               </button>
               <button
                 type="button"
                 onClick={() => setTone('standard')}
                 className={`py-2 px-3 rounded-xl text-xs font-semibold border transition ${
                   tone === 'standard'
-                    ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-xs'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-xs'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
                 }`}
               >
-                ðŸ“‹ Standard Formal
+                📋 Standard Formal
               </button>
               <button
                 type="button"
                 onClick={() => setTone('urgent')}
                 className={`py-2 px-3 rounded-xl text-xs font-semibold border transition ${
                   tone === 'urgent'
-                    ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-xs'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    ? 'bg-rose-50 dark:bg-rose-950/60 border-rose-500 text-rose-700 dark:text-rose-300 shadow-xs'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
                 }`}
               >
-                âš ï¸  Urgent Overdue
+                ⚠️ Urgent Overdue
               </button>
             </div>
           </div>
 
           {/* Custom Note */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
               Add Personal Note (Optional)
             </label>
             <input
@@ -158,34 +158,34 @@ export function SendReminderModal({ invoice, onClose, onSuccess, onError }: Send
               value={customMessage}
               onChange={(e) => setCustomMessage(e.target.value)}
               placeholder="e.g. Thanks for your partnership! Wire details are in invoice."
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
           {/* Live Preview Box */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Live Email Preview</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Live Email Preview</label>
               <button
                 type="button"
                 onClick={handleCopyText}
-                className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium"
               >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{copied ? 'Copied to Clipboard!' : 'Copy Text'}</span>
               </button>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono text-slate-800 max-h-48 overflow-y-auto space-y-2">
+            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-xs font-mono text-slate-800 dark:text-slate-200 max-h-48 overflow-y-auto space-y-2">
               {loadingPreview ? (
-                <div className="py-4 text-center text-slate-400">Rendering preview...</div>
+                <div className="py-4 text-center text-slate-400 dark:text-slate-500">Rendering preview...</div>
               ) : preview ? (
                 <>
-                  <div className="pb-2 border-b border-slate-200">
-                    <span className="text-slate-400 font-sans font-medium">Subject:</span>{' '}
-                    <span className="font-bold text-slate-900 font-sans">{preview.subject}</span>
+                  <div className="pb-2 border-b border-slate-200 dark:border-slate-800">
+                    <span className="text-slate-400 dark:text-slate-500 font-sans font-medium">Subject:</span>{' '}
+                    <span className="font-bold text-slate-900 dark:text-white font-sans">{preview.subject}</span>
                   </div>
-                  <div className="whitespace-pre-line text-slate-700 font-sans leading-relaxed pt-1">
+                  <div className="whitespace-pre-line text-slate-700 dark:text-slate-300 font-sans leading-relaxed pt-1">
                     {preview.text}
                   </div>
                 </>
@@ -197,11 +197,11 @@ export function SendReminderModal({ invoice, onClose, onSuccess, onError }: Send
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-t border-slate-200">
+        <div className="flex items-center justify-between px-6 py-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium hover:bg-slate-100"
+            className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
           >
             Cancel
           </button>

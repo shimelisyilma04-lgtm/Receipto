@@ -199,29 +199,26 @@ export function getOwnerDemoEmail(): string {
       }
     }
   } catch {}
-  return 'shimelisyilma04@gmail.com';
+  return 'receiptobusiness@gmail.com';
 }
 
 /**
- * Checks if an email matches the configured OWNER_DEMO_EMAIL.
+ * Checks if an email matches the configured OWNER_DEMO_EMAIL or admin email.
  * Strictly server-side; NEVER expose the email to frontend clients.
  */
 export function isOwnerEmail(email?: string | null): boolean {
   if (!email) return false;
+  const clean = email.trim().toLowerCase();
   const ownerEmail = getOwnerDemoEmail();
-  if (!ownerEmail) return false;
-  return email.trim().toLowerCase() === ownerEmail;
+  return (ownerEmail ? clean === ownerEmail : false) || clean === 'receiptobusiness@gmail.com' || clean === 'rshimelis48@gmail.com';
 }
 
 /**
  * Checks if a user account is the verified owner account.
- * Both email matching and email_verified === true are strictly required.
  */
 export function isOwnerAccount(user: { email?: string; email_verified?: boolean } | null | undefined): boolean {
   if (!user || !user.email) return false;
-  const ownerEmail = getOwnerDemoEmail();
-  if (!ownerEmail) return false;
-  return user.email.trim().toLowerCase() === ownerEmail && Boolean(user.email_verified);
+  return isOwnerEmail(user.email);
 }
 
 /**

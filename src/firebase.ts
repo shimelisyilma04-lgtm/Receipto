@@ -13,6 +13,7 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth';
 import {
+  initializeFirestore,
   getFirestore,
   doc,
   getDocFromServer,
@@ -33,8 +34,20 @@ import firebaseConfig from '../firebase-applet-config.json';
 // Initialize Firebase App
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize Firestore with configured database ID
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Initialize Firestore with configured database ID and long polling for browser & cloud environments
+export const db = (() => {
+  try {
+    return initializeFirestore(
+      app,
+      {
+        experimentalForceLongPolling: true,
+      },
+      firebaseConfig.firestoreDatabaseId
+    );
+  } catch {
+    return getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  }
+})();
 
 // Initialize Firebase Auth
 export const auth = getAuth(app);

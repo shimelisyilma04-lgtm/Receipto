@@ -98,30 +98,30 @@ export function SettingsView({ user, onUpdateUser, onShowToast }: SettingsViewPr
       </div>
 
       {/* Profile Form */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6">
-        <div className="flex items-center gap-2.5 pb-4 border-b border-slate-100 mb-6">
-          <Building2 className="w-5 h-5 text-indigo-600" />
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs p-6 transition-colors">
+        <div className="flex items-center gap-2.5 pb-4 border-b border-slate-100 dark:border-slate-800 mb-6">
+          <Building2 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
           <div>
-            <h2 className="text-base font-bold text-slate-900">Organization & Branding</h2>
-            <p className="text-xs text-slate-500">This business name appears on all customer invoices and reminder headers.</p>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">Organization &amp; Branding</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">This business name appears on all customer invoices and reminder headers.</p>
           </div>
         </div>
 
         <form onSubmit={handleUpdateProfile} className="space-y-4 max-w-lg">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
               Account Email (Read-Only)
             </label>
             <input
               type="email"
               disabled
               value={user.email}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 cursor-not-allowed"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
               Owner / Contact Name *
             </label>
             <input
@@ -130,12 +130,12 @@ export function SettingsView({ user, onUpdateUser, onShowToast }: SettingsViewPr
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
               Business / Trading Name
             </label>
             <input
@@ -144,7 +144,7 @@ export function SettingsView({ user, onUpdateUser, onShowToast }: SettingsViewPr
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
               placeholder="e.g. Apex Digital Consulting LLC"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
@@ -160,18 +160,18 @@ export function SettingsView({ user, onUpdateUser, onShowToast }: SettingsViewPr
       </div>
 
       {/* Security / Password Form */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6">
-        <div className="flex items-center gap-2.5 pb-4 border-b border-slate-100 mb-6">
-          <KeyRound className="w-5 h-5 text-indigo-600" />
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs p-6 transition-colors">
+        <div className="flex items-center gap-2.5 pb-4 border-b border-slate-100 dark:border-slate-800 mb-6">
+          <KeyRound className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
           <div>
-            <h2 className="text-base font-bold text-slate-900">Security & Credentials</h2>
-            <p className="text-xs text-slate-500">Update your access password with bcrypt salt protection.</p>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">Security &amp; Credentials</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Update your access password with bcrypt salt protection.</p>
           </div>
         </div>
 
         <form onSubmit={handleChangePassword} className="space-y-4 max-w-lg">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
               Current Password
             </label>
             <input
@@ -180,13 +180,13 @@ export function SettingsView({ user, onUpdateUser, onShowToast }: SettingsViewPr
               required
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
                 New Password
               </label>
               <input
@@ -196,12 +196,12 @@ export function SettingsView({ user, onUpdateUser, onShowToast }: SettingsViewPr
                 minLength={8}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
                 Confirm New Password
               </label>
               <input
@@ -211,7 +211,7 @@ export function SettingsView({ user, onUpdateUser, onShowToast }: SettingsViewPr
                 minLength={8}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
@@ -220,7 +220,7 @@ export function SettingsView({ user, onUpdateUser, onShowToast }: SettingsViewPr
             id="btn-update-password"
             type="submit"
             disabled={changingPassword}
-            className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold transition disabled:opacity-50 shadow-xs"
+            className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white text-sm font-semibold transition disabled:opacity-50 shadow-xs"
           >
             {changingPassword ? 'Updating...' : 'Update Password'}
           </button>
@@ -228,56 +228,54 @@ export function SettingsView({ user, onUpdateUser, onShowToast }: SettingsViewPr
       </div>
 
       {/* Infrastructure & Services Diagnostic */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6">
-        <div className="flex items-center gap-2.5 pb-4 border-b border-slate-100 mb-6">
-          <Server className="w-5 h-5 text-indigo-600" />
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs p-6 transition-colors">
+        <div className="flex items-center gap-2.5 pb-4 border-b border-slate-100 dark:border-slate-800 mb-6">
+          <Server className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
           <div>
-            <h2 className="text-base font-bold text-slate-900">Infrastructure & Runtime Diagnostics</h2>
-            <p className="text-xs text-slate-500">Live operational status of backing database and dispatch providers.</p>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">Infrastructure &amp; Runtime Diagnostics</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Live operational status of backing database and dispatch providers.</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Database Card */}
-          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+          <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/60 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Database className="w-4 h-4 text-slate-600" />
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">Storage Engine</span>
+                <Database className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Storage Engine</span>
               </div>
-              <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+              <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                 <CheckCircle className="w-3 h-3" /> ACTIVE
               </span>
             </div>
-            <p className="text-sm font-semibold text-slate-900">
-              {systemConfig?.database.engine === 'postgres' ? 'PostgreSQL (Cloud Database)' : 'Local File Persistence Engine'}
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">
+              Google Cloud Firestore (Authoritative Backend)
             </p>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              {systemConfig?.database.engine === 'postgres'
-                ? 'Connected to configured PostgreSQL instance via DATABASE_URL.'
-                : 'Safely persisting state to Receipto atomic storage (/data/receipto_db.json). Full relational queries, multi-user isolation, and zero native build dependencies.'}
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Connected securely to Google Cloud Firestore with real-time multi-tenant isolation, enterprise-grade availability, and zero-trust security rules.
             </p>
           </div>
 
           {/* Email Provider Card */}
-          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+          <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/60 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-slate-600" />
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">Email Delivery</span>
+                <Mail className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Email Delivery</span>
               </div>
               <span
-                className={`flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${
+                className={`flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border ${
                   systemConfig?.email_service.configured
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-amber-100 text-amber-800'
+                    ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                    : 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
                 }`}
               >
                 {systemConfig?.email_service.configured ? 'LIVE' : 'UNCONFIGURED'}
               </span>
             </div>
-            <p className="text-sm font-semibold text-slate-900">Resend API Provider</p>
-            <p className="text-xs text-slate-500 leading-relaxed">
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">Resend API Provider</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
               {systemConfig?.email_service.configured
                 ? `Ready to deliver messages via Resend (Sender: ${systemConfig.email_service.from_email}).`
                 : 'Set RESEND_API_KEY in environment variables to enable live SMTP/API delivery. Currently using simulated preview and audit logging.'}

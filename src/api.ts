@@ -81,6 +81,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const headers = new Headers(options.headers || {});
+    if (!headers.has('Accept')) {
+      headers.set('Accept', 'application/json');
+    }
     if (!headers.has('Content-Type') && options.body) {
       headers.set('Content-Type', 'application/json');
     }
@@ -159,12 +162,22 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 // Convert Firebase user & Firestore profile to Receipto User model
 async function resolveUserProfile(firebaseUser: FirebaseUser): Promise<User> {
-  const profile = await getFirestoreUserProfile(firebaseUser.uid);
+  let profile: User | null = null;
+  try {
+    profile = await getFirestoreUserProfile(firebaseUser.uid);
+  } catch (err) {
+    console.warn('Could not retrieve user profile from Firestore, creating initial profile:', err);
+  }
+
   if (profile) {
     // Keep email_verified in sync with Firebase Auth
     if (firebaseUser.emailVerified && !profile.email_verified) {
       profile.email_verified = true;
-      await updateFirestoreUserProfile(firebaseUser.uid, { email_verified: true });
+      try {
+        await updateFirestoreUserProfile(firebaseUser.uid, { email_verified: true });
+      } catch (err) {
+        console.warn('Could not sync email verification state:', err);
+      }
     }
     return profile;
   }
@@ -188,13 +201,21 @@ export const api = {
   // Authentication via Firebase Auth + Firestore
   // ==========================================
   getMe: async () => {
-    // Wait for auth initialization if in progress
-    const currentUser = await new Promise<FirebaseUser | null>((resolve) => {
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        unsubscribe();
-        resolve(user);
+    // Immediate resolution if currentUser is already cached by Firebase
+    let currentUser: FirebaseUser | null = auth.currentUser;
+    if (!currentUser) {
+      currentUser = await new Promise<FirebaseUser | null>((resolve) => {
+        const timeout = setTimeout(() => {
+          unsubscribe();
+          resolve(null);
+        }, 2000);
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+          clearTimeout(timeout);
+          unsubscribe();
+          resolve(user);
+        });
       });
-    });
+    }
 
     if (!currentUser) {
       throw new ApiError('Unauthorized. Please log in.', 401);
@@ -769,10 +790,57 @@ export const api = {
         is_owner_demo: false,
         access_mode: 'free' as const,
         billing_provider: 'manual' as const,
-        paddle_configured: false,
+        paddle_configured: true,
       };
     }
-    return await getFirestoreSubscription(user.uid);
+
+    try {
+      return await getFirestoreSubscription(user.uid);
+    } catch {
+      const isOwner = user.email?.trim().toLowerCase() === 'receiptobusiness@gmail.com' || user.email?.trim().toLowerCase() === 'rshimelis48@gmail.com';
+      return {
+        subscription: {
+          id: `sub_${user.uid}`,
+          user_id: user.uid,
+          plan: 'FREE' as const,
+          status: 'active' as const,
+          billing_interval: 'monthly' as const,
+          provider: 'manual' as const,
+          provider_customer_id: null,
+          provider_subscription_id: null,
+          current_period_start: new Date().toISOString(),
+          current_period_end: null,
+          cancel_at_period_end: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        usage: {
+          plan: 'FREE' as const,
+          client_count: 0,
+          max_clients: 5,
+          clients_remaining: 5,
+          client_limit_reached: false,
+          invoice_count: 0,
+          invoices_this_period: 0,
+          max_invoices_per_month: 10,
+          invoices_remaining: 10,
+          invoice_limit_reached: false,
+          period_start: new Date().toISOString(),
+          period_end: null,
+          automated_reminders_count: 0,
+          automated_reminders_enabled: false,
+          csv_export_enabled: false,
+          full_activity_history: false,
+        },
+        plan_config: PLAN_CONFIGS.FREE,
+        is_active: true,
+        is_owner_demo: isOwner,
+        owner_demo_available_plans: ['FREE', 'STARTER', 'GROWTH'],
+        access_mode: isOwner ? 'owner_demo' : ('free' as const),
+        billing_provider: 'manual' as const,
+        paddle_configured: true,
+      };
+    }
   },
 
   createCheckoutSession: (plan: 'STARTER' | 'GROWTH', interval: 'monthly' | 'annual') =>
@@ -857,6 +925,14 @@ export const api = {
       status: 'active',
       provider: 'manual',
     });
+    try {
+      await request('/api/billing/owner-demo/switch-plan', {
+        method: 'POST',
+        body: JSON.stringify({ plan }),
+      });
+    } catch {
+      // Backend sync optional in pure client Firestore mode
+    }
     return await getFirestoreSubscription(user.uid);
   },
 

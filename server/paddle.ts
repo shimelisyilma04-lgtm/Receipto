@@ -34,19 +34,16 @@ export function isPaddleWebhookConfigured(): boolean {
 
 export function getPaddleEnvironment(): 'sandbox' | 'production' {
   const env = (process.env.PADDLE_ENVIRONMENT || process.env.PADDLE_ENV)?.trim().toLowerCase();
-  if (env === 'sandbox') return 'sandbox';
   if (env === 'production' || env === 'live') return 'production';
-  // If client token is provided with live_ prefix, it's production
+  if (env === 'sandbox' || env === 'test') return 'sandbox';
   if (process.env.PADDLE_CLIENT_TOKEN?.trim().startsWith('live_')) return 'production';
-  // If client token starts with test_, it's sandbox
-  if (process.env.PADDLE_CLIENT_TOKEN?.trim().startsWith('test_')) return 'sandbox';
-  // Default to production for live deployment
-  return 'production';
+  return 'sandbox';
 }
 
 export function getPaddleBaseUrl(): string {
-  // Live Paddle API endpoint
-  return 'https://api.paddle.com';
+  return getPaddleEnvironment() === 'sandbox'
+    ? 'https://sandbox-api.paddle.com'
+    : 'https://api.paddle.com';
 }
 
 export function getPaddleClientToken(): string {

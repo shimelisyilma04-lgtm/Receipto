@@ -44,47 +44,7 @@ export function LandingPage({
   onNavigateLegal,
 }: LandingPageProps) {
   const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
-  const [demoTone, setDemoTone] = useState<'friendly' | 'standard' | 'urgent'>('friendly');
   const [activeFaq, setActiveFaq] = useState<number | null>(0);
-  const [selectedAging, setSelectedAging] = useState<'all' | 'current' | 'overdue30' | 'overdue60'>('all');
-
-  const demoInvoices = [
-    {
-      id: 'inv-1',
-      invoiceNumber: 'INV-2026-084',
-      client: 'Acme Media Labs',
-      amount: '$3,400.00',
-      dueDate: 'Today',
-      status: 'Due Soon',
-      tone: 'friendly' as const,
-      aging: 'current',
-    },
-    {
-      id: 'inv-2',
-      invoiceNumber: 'INV-2026-071',
-      client: 'Vanguard Design Group',
-      amount: '$1,850.00',
-      dueDate: '12 days overdue',
-      status: 'Overdue',
-      tone: 'standard' as const,
-      aging: 'overdue30',
-    },
-    {
-      id: 'inv-3',
-      invoiceNumber: 'INV-2026-059',
-      client: 'Starlight Retail Inc.',
-      amount: '$2,350.00',
-      dueDate: '38 days overdue',
-      status: 'Critical Overdue',
-      tone: 'urgent' as const,
-      aging: 'overdue60',
-    },
-  ];
-
-  const filteredInvoices = demoInvoices.filter((inv) => {
-    if (selectedAging === 'all') return true;
-    return inv.aging === selectedAging;
-  });
 
   const faqs = [
     {
@@ -124,7 +84,6 @@ export function LandingPage({
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600 dark:text-slate-300">
             <a href="#features" className="hover:text-indigo-600 dark:hover:text-white transition">Features</a>
-            <a href="#demo" className="hover:text-indigo-600 dark:hover:text-white transition">Interactive Demo</a>
             <a href="#pricing" className="hover:text-indigo-600 dark:hover:text-white transition">Pricing</a>
             <a href="#faq" className="hover:text-indigo-600 dark:hover:text-white transition">FAQ</a>
           </nav>
@@ -152,23 +111,14 @@ export function LandingPage({
                 <ArrowRight className="w-4 h-4" />
               </button>
             ) : (
-              <>
-                <button
-                  id="btn-nav-login"
-                  onClick={() => onOpenAuth('login')}
-                  className="px-3.5 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition"
-                >
-                  Sign in
-                </button>
-                <button
-                  id="btn-nav-signup"
-                  onClick={() => onOpenAuth('register')}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition shadow-lg shadow-indigo-600/25"
-                >
-                  <span>Start for free</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </>
+              <button
+                id="btn-nav-get-started"
+                onClick={() => onOpenAuth('register')}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition shadow-lg shadow-indigo-600/25"
+              >
+                <span>Get Started</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             )}
           </div>
         </div>
@@ -208,22 +158,14 @@ export function LandingPage({
                 <ArrowRight className="w-5 h-5" />
               </button>
             ) : (
-              <>
-                <button
-                  id="btn-hero-start-free"
-                  onClick={() => onOpenAuth('register')}
-                  className="w-full sm:w-auto px-8 py-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-base transition shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-2"
-                >
-                  <span>Start for free</span>
-                  <ArrowRight className="w-5 h-5" />
-                </button>
-                <a
-                  href="#demo"
-                  className="w-full sm:w-auto px-6 py-4 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white font-semibold text-base transition border border-slate-200 dark:border-slate-800 text-center shadow-xs"
-                >
-                  See live demo
-                </a>
-              </>
+              <button
+                id="btn-hero-get-started"
+                onClick={() => onOpenAuth('register')}
+                className="w-full sm:w-auto px-8 py-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-base transition shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-2"
+              >
+                <span>Get Started</span>
+                <ArrowRight className="w-5 h-5" />
+              </button>
             )}
           </div>
 
@@ -245,222 +187,7 @@ export function LandingPage({
         </div>
       </section>
 
-      {/* 3. Interactive Product Showcase / Demo Section */}
-      <section id="demo" className="py-16 bg-slate-100/70 dark:bg-slate-900/60 border-y border-slate-200 dark:border-slate-800 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight mb-3">
-              The Accounts-Receivable Command Center
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400 text-sm sm:text-base">
-              Explore how Receipto tracks aging balances and prepares the perfect email reminder with one click.
-            </p>
-          </div>
-
-          {/* Interactive AR Mockup */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl dark:shadow-2xl overflow-hidden transition-colors">
-            {/* Top Mockup Header Bar */}
-            <div className="p-4 sm:p-6 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                  <TrendingUp className="w-4 h-4" />
-                </div>
-                <div>
-                  <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Live Accounts Receivable</span>
-                  <div className="text-lg font-bold text-slate-900 dark:text-white">$18,450.00 Outstanding</div>
-                </div>
-              </div>
-
-              {/* Metric highlights */}
-              <div className="flex items-center gap-6 text-xs">
-                <div>
-                  <div className="text-slate-500 dark:text-slate-400">Overdue Total</div>
-                  <div className="font-bold text-rose-600 dark:text-rose-400 text-sm">$4,200.00</div>
-                </div>
-                <div>
-                  <div className="text-slate-500 dark:text-slate-400">On-Time Recovery</div>
-                  <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">94.2%</div>
-                </div>
-                <div>
-                  <div className="text-slate-500 dark:text-slate-400">Average DSO</div>
-                  <div className="font-bold text-indigo-600 dark:text-indigo-400 text-sm">24 Days</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Aging Filter Tabs */}
-            <div className="p-4 bg-white/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium mr-1">Aging Filter:</span>
-                <button
-                  onClick={() => setSelectedAging('all')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
-                    selectedAging === 'all'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  All Invoices
-                </button>
-                <button
-                  onClick={() => setSelectedAging('current')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
-                    selectedAging === 'current'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  Current (0-30d)
-                </button>
-                <button
-                  onClick={() => setSelectedAging('overdue30')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
-                    selectedAging === 'overdue30'
-                      ? 'bg-amber-600 text-white'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  Overdue (31-60d)
-                </button>
-                <button
-                  onClick={() => setSelectedAging('overdue60')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
-                    selectedAging === 'overdue60'
-                      ? 'bg-rose-600 text-white'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  Critical (60d+)
-                </button>
-              </div>
-
-              <div className="text-xs text-slate-500 dark:text-slate-400">
-                Showing {filteredInvoices.length} active receivables
-              </div>
-            </div>
-
-            {/* Split View: Left list of invoices, Right live email preview */}
-            <div className="grid grid-cols-1 lg:grid-cols-12">
-              {/* Invoices List */}
-              <div className="lg:col-span-6 p-4 sm:p-6 space-y-3 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800">
-                <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
-                  Receivables Queue
-                </div>
-
-                {filteredInvoices.map((inv) => (
-                  <div
-                    key={inv.id}
-                    className="p-4 rounded-xl bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs transition flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-xs text-indigo-600 dark:text-indigo-400 font-semibold">{inv.invoiceNumber}</span>
-                        <span
-                          className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                            inv.status === 'Critical Overdue'
-                              ? 'bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'
-                              : inv.status === 'Overdue'
-                              ? 'bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
-                              : 'bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300'
-                          }`}
-                        >
-                          {inv.status}
-                        </span>
-                      </div>
-                      <div className="text-sm font-semibold text-slate-900 dark:text-white">{inv.client}</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{inv.dueDate}</div>
-                    </div>
-
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-slate-900 dark:text-white">{inv.amount}</div>
-                      <button
-                        onClick={() => setDemoTone(inv.tone)}
-                        className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium inline-flex items-center gap-1"
-                      >
-                        <Send className="w-3 h-3" />
-                        <span>Preview Reminder</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Live Email Tone Dispatch Preview */}
-              <div className="lg:col-span-6 p-4 sm:p-6 bg-slate-50/70 dark:bg-slate-950/40">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Reminder Dispatch Engine
-                  </div>
-                  <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs">
-                    <button
-                      onClick={() => setDemoTone('friendly')}
-                      className={`px-2.5 py-1 rounded text-xs font-medium transition ${
-                        demoTone === 'friendly' ? 'bg-indigo-600 text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      Friendly
-                    </button>
-                    <button
-                      onClick={() => setDemoTone('standard')}
-                      className={`px-2.5 py-1 rounded text-xs font-medium transition ${
-                        demoTone === 'standard' ? 'bg-indigo-600 text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      Standard
-                    </button>
-                    <button
-                      onClick={() => setDemoTone('urgent')}
-                      className={`px-2.5 py-1 rounded text-xs font-medium transition ${
-                        demoTone === 'urgent' ? 'bg-rose-600 text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      Urgent
-                    </button>
-                  </div>
-                </div>
-
-                {/* Simulated Email Envelope */}
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 text-xs space-y-3 shadow-xs">
-                  <div className="border-b border-slate-200 dark:border-slate-800 pb-2">
-                    <div className="text-slate-500 dark:text-slate-400">
-                      Subject:{' '}
-                      <span className="text-slate-900 dark:text-white font-semibold">
-                        {demoTone === 'friendly' && 'Invoice #INV-2026-084 Payment Reminder from Your Business'}
-                        {demoTone === 'standard' && 'Payment Reminder: Invoice #INV-2026-071 ($1,850.00)'}
-                        {demoTone === 'urgent' && 'URGENT: Overdue Payment Notice - Invoice #INV-2026-059'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2 text-slate-700 dark:text-slate-300 text-xs leading-relaxed">
-                    <div className="font-semibold text-slate-900 dark:text-white">Dear Finance Team,</div>
-                    {demoTone === 'friendly' && (
-                      <p>
-                        We hope you are having a productive week. This is a friendly reminder that invoice <strong className="text-slate-900 dark:text-white">#INV-2026-084</strong> ($3,400.00) is scheduled for payment today.
-                      </p>
-                    )}
-                    {demoTone === 'standard' && (
-                      <p>
-                        Please be advised that invoice <strong className="text-slate-900 dark:text-white">#INV-2026-071</strong> ($1,850.00) was due on March 7, 2026 and remains outstanding. Please let us know when payment will be processed.
-                      </p>
-                    )}
-                    {demoTone === 'urgent' && (
-                      <p className="text-rose-700 dark:text-rose-200">
-                        Our records indicate that invoice <strong className="text-slate-900 dark:text-white">#INV-2026-059</strong> ($2,350.00) is now 38 days overdue. Please process payment immediately to maintain uninterrupted service.
-                      </p>
-                    )}
-                    <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80 text-[11px] text-slate-500">
-                      Sent automatically via Receipto &bull; One-click payment link included
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. Core Features Grid */}
+      {/* 3. Core Features Grid */}
       <section id="features" className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-4">
@@ -764,10 +491,11 @@ export function LandingPage({
               </button>
             ) : (
               <button
+                id="btn-cta-get-started"
                 onClick={() => onOpenAuth('register')}
                 className="px-8 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm transition shadow-xl shadow-indigo-600/30 inline-flex items-center gap-2"
               >
-                <span>Create Free Account</span>
+                <span>Get Started</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             )}
@@ -775,7 +503,7 @@ export function LandingPage({
         </div>
       </section>
 
-      {/* 9. Professional Footer */}
+      {/* 5. Professional Footer */}
       <footer className="bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800/80 py-12 text-slate-600 dark:text-slate-400 text-xs transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
@@ -793,7 +521,7 @@ export function LandingPage({
                 className="hover:text-slate-900 dark:hover:text-white transition flex items-center gap-1.5 text-xs"
               >
                 <LifeBuoy className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
-                <span>Support: shimelisyilma04@gmail.com</span>
+                <span>Support: receiptobusiness@gmail.com</span>
               </button>
             )}
             <button

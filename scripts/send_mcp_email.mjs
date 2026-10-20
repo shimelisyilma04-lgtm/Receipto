@@ -10,7 +10,7 @@ export async function sendEmailViaMCP({
   html,
   apiKey = process.env.RESEND_API_KEY
 }) {
-  if (!apiKey || apiKey === 'Redmoon56#' || !apiKey.startsWith('re_')) {
+  if (!apiKey || !apiKey.startsWith('re_')) {
     return {
       success: false,
       configured: false,
@@ -82,7 +82,7 @@ export async function sendEmailViaMCP({
 
 // CLI runner if invoked directly
 if (process.argv[1]?.endsWith('send_mcp_email.mjs')) {
-  const to = process.argv[2] || 'shimelisyilma04@gmail.com';
+  const to = process.argv[2] || 'receiptobusiness@gmail.com';
   const subject = process.argv[3] || 'Hello from MCP';
   const from = process.argv[4] || 'onboarding@resend.dev';
 
