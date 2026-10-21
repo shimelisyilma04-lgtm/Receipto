@@ -107,10 +107,10 @@ export async function setFirestoreUserProfile(uid: string, profile: Partial<User
       updated_at: now,
     };
 
-    if (profile.paddle_customer_id !== undefined && profile.paddle_customer_id !== null) {
-      userData.paddle_customer_id = profile.paddle_customer_id;
-    } else if (existingDoc?.paddle_customer_id) {
-      userData.paddle_customer_id = existingDoc.paddle_customer_id;
+    if (profile.stripe_customer_id !== undefined && profile.stripe_customer_id !== null) {
+      userData.stripe_customer_id = profile.stripe_customer_id;
+    } else if (existingDoc?.stripe_customer_id) {
+      userData.stripe_customer_id = existingDoc.stripe_customer_id;
     }
 
     const sanitizedData = sanitizeForFirestore(userData);
@@ -614,7 +614,7 @@ export async function getFirestoreSubscription(uid: string): Promise<Subscriptio
       owner_demo_available_plans: ['FREE', 'STARTER', 'GROWTH'],
       access_mode: (auth.currentUser?.email?.trim().toLowerCase() === 'receiptobusiness@gmail.com' || auth.currentUser?.email?.trim().toLowerCase() === 'rshimelis48@gmail.com') ? 'owner_demo' : 'free',
       billing_provider: 'manual',
-      paddle_configured: true,
+      stripe_configured: true,
     };
   } catch (err) {
     handleFirestoreError(err, OperationType.GET, path);
@@ -627,9 +627,9 @@ export async function setFirestoreSubscription(
     plan: 'FREE' | 'STARTER' | 'GROWTH';
     status?: 'active' | 'trialing' | 'past_due' | 'canceled' | 'paused';
     billing_interval?: 'monthly' | 'annual';
-    provider?: 'manual' | 'paddle';
-    paddle_customer_id?: string;
-    paddle_subscription_id?: string;
+    provider?: 'manual' | 'stripe';
+    stripe_customer_id?: string;
+    stripe_subscription_id?: string;
   }
 ): Promise<SubscriptionDetails> {
   const path = `users/${uid}/subscription/details`;
@@ -644,9 +644,9 @@ export async function setFirestoreSubscription(
       plan: data.plan,
       status: data.status || 'active',
       billing_interval: data.billing_interval || 'monthly',
-      provider: data.provider || 'paddle',
-      paddle_customer_id: data.paddle_customer_id || (existing.exists() ? existing.data().paddle_customer_id : null),
-      paddle_subscription_id: data.paddle_subscription_id || (existing.exists() ? existing.data().paddle_subscription_id : null),
+      provider: data.provider || 'stripe',
+      stripe_customer_id: data.stripe_customer_id || (existing.exists() ? existing.data().stripe_customer_id : null),
+      stripe_subscription_id: data.stripe_subscription_id || (existing.exists() ? existing.data().stripe_subscription_id : null),
       current_period_start: now,
       updated_at: now,
     };

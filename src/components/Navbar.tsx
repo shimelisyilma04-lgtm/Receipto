@@ -28,6 +28,7 @@ interface NavbarProps {
   onLogout: () => void;
   plan?: PlanTier;
   onOpenSupport: () => void;
+  onNavigateLegal?: (tab: 'terms' | 'privacy' | 'refund') => void;
 }
 
 export function Navbar({
@@ -37,6 +38,7 @@ export function Navbar({
   onLogout,
   plan = 'FREE',
   onOpenSupport,
+  onNavigateLegal,
 }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -299,6 +301,44 @@ export function Navbar({
                       <span>Contact Support</span>
                     </button>
                   </div>
+
+                  {/* Legal & Policies */}
+                  {onNavigateLegal && (
+                    <div className="px-3 py-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 text-[11px] flex items-center justify-between text-slate-500 dark:text-slate-400">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onNavigateLegal('terms');
+                        }}
+                        className="hover:text-indigo-600 dark:hover:text-white transition"
+                      >
+                        Terms
+                      </button>
+                      <span>&bull;</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onNavigateLegal('privacy');
+                        }}
+                        className="hover:text-indigo-600 dark:hover:text-white transition"
+                      >
+                        Privacy
+                      </button>
+                      <span>&bull;</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onNavigateLegal('refund');
+                        }}
+                        className="hover:text-indigo-600 dark:hover:text-white transition"
+                      >
+                        Refund Policy
+                      </button>
+                    </div>
+                  )}
 
                   {/* Highlighted Upgrade Your Plan Action */}
                   <div className="p-2 border-t border-slate-100 dark:border-slate-800 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/20 dark:to-purple-950/20">

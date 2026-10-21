@@ -40,7 +40,7 @@ interface UnverifiedState {
 function getLegalRouteFromPath(): LegalTab | null {
   if (typeof window === 'undefined') return null;
   const path = window.location.pathname.toLowerCase();
-  if (path === '/terms' || path === '/terms-of-service') return 'terms';
+  if (path === '/terms' || path === '/terms-of-service' || path === '/terms-and-conditions') return 'terms';
   if (path === '/privacy' || path === '/privacy-policy') return 'privacy';
   if (path === '/refund-policy' || path === '/refund' || path === '/cancellation-policy') return 'refund';
   return null;
@@ -416,7 +416,7 @@ export default function App() {
           onOpenTerms={() => setIsTermsOpen(true)}
           onOpenSupport={() => setIsSupportModalOpen(true)}
           onNavigateLegal={(tab) => {
-            const path = tab === 'terms' ? '/terms' : tab === 'privacy' ? '/privacy' : '/refund-policy';
+            const path = tab === 'terms' ? '/terms-and-conditions' : tab === 'privacy' ? '/privacy-policy' : '/refund-policy';
             window.history.pushState({}, '', path);
             setLegalRoute(tab);
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -444,6 +444,12 @@ export default function App() {
         onLogout={handleLogout}
         plan={subscriptionDetails?.subscription?.plan}
         onOpenSupport={() => setIsSupportModalOpen(true)}
+        onNavigateLegal={(tab) => {
+          const path = tab === 'terms' ? '/terms-and-conditions' : tab === 'privacy' ? '/privacy-policy' : '/refund-policy';
+          window.history.pushState({}, '', path);
+          setLegalRoute(tab);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
       />
 
       {/* Main Content Area */}

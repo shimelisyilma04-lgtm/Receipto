@@ -451,35 +451,35 @@ async function runAllTests() {
     logFail('Data persistence verification', err.message);
   }
 
-  // 18. Paddle Subscription Endpoint Check
+  // 18. Stripe Subscription Endpoint Check
   try {
     const subRes = await apiRequest('/api/billing/subscription', {}, user1Cookie);
     if (subRes.status === 200 && subRes.data.subscription && subRes.data.usage) {
-      logPass(`Paddle Billing: Subscription details returned (Plan: ${subRes.data.subscription.plan}, Provider: ${subRes.data.subscription.provider})`);
+      logPass(`Stripe Billing: Subscription details returned (Plan: ${subRes.data.subscription.plan}, Provider: ${subRes.data.subscription.provider || subRes.data.payment_provider})`);
     } else {
       throw new Error(`Failed to get subscription: ${subRes.status} - ${JSON.stringify(subRes.data)}`);
     }
   } catch (err) {
-    logFail('Paddle subscription endpoint check', err.message);
+    logFail('Stripe subscription endpoint check', err.message);
   }
 
-  // 19. Paddle Checkout Endpoint Check
+  // 19. Stripe Checkout Endpoint Check
   try {
     const checkoutRes = await apiRequest('/api/billing/checkout', {
       method: 'POST',
-      body: { plan: 'STARTER', interval: 'monthly' },
+      body: { plan: 'STARTER', interval: 'monthly', provider: 'stripe' },
     }, user1Cookie);
 
-    if (checkoutRes.status === 200 && checkoutRes.data.success && checkoutRes.data.price_id) {
-      logPass(`Paddle Checkout: Generated checkout params for STARTER (Price: ${checkoutRes.data.price_id}, Env: ${checkoutRes.data.environment})`);
+    if (checkoutRes.status === 200 && checkoutRes.data.success && checkoutRes.data.checkout_params) {
+      logPass(`Stripe Checkout: Generated checkout session for STARTER (Session ID: ${checkoutRes.data.checkout_params.sessionId || checkoutRes.data.id || 'ok'})`);
     } else {
-      throw new Error(`Failed to initiate checkout: ${checkoutRes.status} - ${JSON.stringify(checkoutRes.data)}`);
+      throw new Error(`Failed to initiate Stripe checkout: ${checkoutRes.status} - ${JSON.stringify(checkoutRes.data)}`);
     }
   } catch (err) {
-    logFail('Paddle checkout endpoint check', err.message);
+    logFail('Stripe checkout endpoint check', err.message);
   }
 
-  // 20. Paddle Plan Simulation & Limit Enforcement Check
+  // 20. Plan Simulation & Limit Enforcement Check
   try {
     // Check initial FREE plan limits (5 clients, 10 invoices)
     const initialSub = await apiRequest('/api/billing/subscription', {}, user1Cookie);
@@ -520,23 +520,26 @@ async function runAllTests() {
     }, user1Cookie);
     logPass('Plan Reset: Returned to FREE tier');
   } catch (err) {
-    logFail('Paddle plan simulation & limit enforcement', err.message);
+    logFail('Plan simulation & limit enforcement', err.message);
   }
 
-  // 21. Paddle Webhook Endpoint Verification
+  // 21. Stripe Webhook Endpoint Verification
   try {
-    const webhookRes = await apiRequest('/api/webhooks/paddle', {
+    const webhookRes = await apiRequest('/api/webhooks/stripe', {
       method: 'POST',
-      body: { event_id: 'evt_test', event_type: 'subscription.created', data: {} },
+      body: {
+        id: `evt_verify_${Date.now()}`,
+        type: 'customer.subscription.created',
+        data: { object: { id: 'sub_verify_123' } },
+      },
     });
-    // Should reject or handle gracefully (e.g. 403 for non-Paddle IP, 400 or 401 for invalid signature, 200 if processed)
-    if (webhookRes.status === 400 || webhookRes.status === 401 || webhookRes.status === 403 || webhookRes.status === 200) {
-      logPass(`Paddle Webhook: Webhook route active and secure (HTTP ${webhookRes.status})`);
+    if (webhookRes.status === 200 && webhookRes.data.received === true) {
+      logPass(`Stripe Webhook: Webhook route active and acknowledged event (HTTP 200)`);
     } else {
-      throw new Error(`Unexpected webhook response: ${webhookRes.status}`);
+      throw new Error(`Unexpected webhook response: ${webhookRes.status} - ${JSON.stringify(webhookRes.data)}`);
     }
   } catch (err) {
-    logFail('Paddle webhook route verification', err.message);
+    logFail('Stripe webhook route verification', err.message);
   }
 
   console.log('\n------------------------------------------------------');

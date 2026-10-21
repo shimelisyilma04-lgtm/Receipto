@@ -15,6 +15,8 @@ export interface StripeCheckoutResult {
   priceId: string;
   plan: PlanTier;
   interval: BillingInterval;
+  successUrl?: string;
+  cancelUrl?: string;
   mode: 'live' | 'test_mock';
   message?: string;
 }
@@ -68,8 +70,8 @@ export async function createStripeCheckoutSession(options: {
   baseUrl: string;
 }): Promise<StripeCheckoutResult> {
   const priceId = getStripePriceId(options.plan, options.interval);
-  const successUrl = `${options.baseUrl}/?billing_success=true&plan=${options.plan}&interval=${options.interval}&session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${options.baseUrl}/?billing_cancelled=true`;
+  const successUrl = `${options.baseUrl}/?billing_success=true&plan=${options.plan}&interval=${options.interval}&session_id={CHECKOUT_SESSION_ID}&provider=stripe`;
+  const cancelUrl = `${options.baseUrl}/?billing_cancelled=true&provider=stripe`;
   const publishableKey = getStripePublishableKey();
 
   if (isStripeConfigured() && priceId) {
@@ -112,13 +114,15 @@ export async function createStripeCheckoutSession(options: {
       priceId,
       plan: options.plan,
       interval: options.interval,
+      successUrl,
+      cancelUrl,
       mode: 'live',
     };
   }
 
   // Graceful test fallback when API keys are not yet configured in environment
   const mockSessionId = `cs_test_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  const mockUrl = `${options.baseUrl}/?billing_success=true&plan=${options.plan}&interval=${options.interval}&session_id=${mockSessionId}&test_mode=true`;
+  const mockUrl = `${options.baseUrl}/?billing_success=true&plan=${options.plan}&interval=${options.interval}&session_id=${mockSessionId}&provider=stripe&test_mode=true`;
 
   return {
     url: mockUrl,
@@ -127,6 +131,8 @@ export async function createStripeCheckoutSession(options: {
     priceId: priceId || `price_${options.plan.toLowerCase()}_${options.interval}`,
     plan: options.plan,
     interval: options.interval,
+    successUrl,
+    cancelUrl,
     mode: 'test_mock',
     message: isStripeConfigured()
       ? `Stripe price ID for ${options.plan} (${options.interval}) is not set in environment.`

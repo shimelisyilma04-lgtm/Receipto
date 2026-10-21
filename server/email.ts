@@ -631,7 +631,7 @@ export async function sendWelcomeEmail(options: WelcomeEmailOptions): Promise<Em
                 <li>Send automated or polite manual reminder notices before and after due dates</li>
               </ul>
             </div>
-            <p style="font-size: 14px; color: #64748b;">If you need assistance setting up custom reminder cadences or Paddle billing, our team is here to help.</p>
+            <p style="font-size: 14px; color: #64748b;">If you need assistance setting up custom reminder cadences or Stripe billing, our team is here to help.</p>
           </div>
           <div class="footer">&copy; ${new Date().getFullYear()} Receipto. All rights reserved.</div>
         </div>

@@ -8,7 +8,6 @@ const suites = [
   { name: 'Core E2E Verification Suite', script: 'scripts/verify.mjs', runner: 'node' },
   { name: 'Bug-Fix & Regression Suite', script: 'scripts/test_bugfixes.mjs', runner: 'node' },
   { name: 'Stripe Configurable Billing Suite', script: 'scripts/test_stripe_integration.mjs', runner: 'node' },
-  { name: 'Paddle Live Migration & Security Suite', script: 'scripts/test_paddle_live_migration.mjs', runner: 'node' },
   { name: 'Owner Demo & Atomic Limits Suite', script: 'scripts/verify_owner_demo.mjs', runner: 'node' },
   { name: 'Cryptographic Email Verification Flow', script: 'scripts/test_email_verification_flow.ts', runner: 'npx', args: ['tsx'] },
 ];
@@ -41,8 +40,8 @@ async function runAll() {
 
   const durationSec = ((Date.now() - startTime) / 1000).toFixed(2);
   console.log('\n======================================================');
-  console.log(`🎉 ALL 6 TEST SUITES PASSED IN ${durationSec}s`);
-  console.log('Total verified tests: 113 across auth, db, billing & security');
+  console.log(`🎉 ALL 5 TEST SUITES PASSED IN ${durationSec}s`);
+  console.log('Total verified tests: 105+ across auth, Firestore, Stripe billing & security');
   console.log('======================================================\n');
 }
 

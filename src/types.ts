@@ -15,8 +15,8 @@ export interface Subscription {
   access_mode?: import('./plans.js').AccessMode;
   provider_customer_id: string | null;
   provider_subscription_id: string | null;
-  paddle_customer_id?: string | null;
-  paddle_subscription_id?: string | null;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
   current_period_start: string;
   current_period_end: string | null;
   cancel_at_period_end: boolean;

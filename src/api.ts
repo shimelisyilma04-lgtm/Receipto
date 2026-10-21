@@ -746,7 +746,7 @@ export const api = {
     }),
 
   // ==========================================
-  // Billing & Subscriptions (Paddle + Cloud Firestore)
+  // Billing & Subscriptions (Stripe + Cloud Firestore)
   // ==========================================
   getSubscription: async (): Promise<SubscriptionDetails> => {
     const user = auth.currentUser;
@@ -790,7 +790,7 @@ export const api = {
         is_owner_demo: false,
         access_mode: 'free' as const,
         billing_provider: 'manual' as const,
-        paddle_configured: true,
+        stripe_configured: true,
       };
     }
 
@@ -838,7 +838,7 @@ export const api = {
         owner_demo_available_plans: ['FREE', 'STARTER', 'GROWTH'],
         access_mode: isOwner ? 'owner_demo' : ('free' as const),
         billing_provider: 'manual' as const,
-        paddle_configured: true,
+        stripe_configured: true,
       };
     }
   },
@@ -846,16 +846,17 @@ export const api = {
   createCheckoutSession: (plan: 'STARTER' | 'GROWTH', interval: 'monthly' | 'annual') =>
     request<{
       success: boolean;
-      paddle_configured: boolean;
-      environment: string;
-      client_token: string;
-      price_id: string;
+      provider: 'stripe';
+      stripe_configured: boolean;
+      url?: string | null;
+      session_id?: string;
+      publishable_key?: string;
+      price_id?: string;
       plan: 'STARTER' | 'GROWTH';
       interval: 'monthly' | 'annual';
       customer_email?: string;
-      customer_id?: string;
-      custom_data?: any;
-      checkout_params: any;
+      checkout_params?: any;
+      message?: string;
     }>('/api/billing/checkout', {
       method: 'POST',
       body: JSON.stringify({ plan, interval }),
@@ -863,11 +864,7 @@ export const api = {
 
   createCustomerPortalSession: () =>
     request<{
-      subscription_id?: string;
-      status?: string;
-      plan?: string;
-      update_payment_method_url?: string | null;
-      cancel_url?: string | null;
+      url?: string | null;
       message?: string;
     }>('/api/billing/portal', {
       method: 'POST',
@@ -897,8 +894,8 @@ export const api = {
         plan,
         billing_interval: interval,
         status: 'active',
-        provider: 'paddle',
-        paddle_subscription_id: typeof data === 'object' ? data.subscription_id : undefined,
+        provider: 'stripe',
+        stripe_subscription_id: typeof data === 'object' ? data.subscription_id : undefined,
       });
       return await getFirestoreSubscription(user.uid);
     }

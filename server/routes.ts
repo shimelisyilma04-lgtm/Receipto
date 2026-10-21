@@ -2061,8 +2061,7 @@ router.get('/billing/subscription', requireAuth, async (req: AuthenticatedReques
       is_owner_demo: isOwner,
       access_mode: isOwner ? 'owner_demo' : 'standard',
       owner_demo_available_plans: isOwner ? ['FREE', 'STARTER', 'GROWTH'] : undefined,
-      payment_provider: process.env.PAYMENT_PROVIDER || 'paddle',
-      paddle_configured: isPaddleConfigured(),
+      payment_provider: 'stripe',
       stripe_configured: isStripeConfigured(),
       stripe_publishable_key: getStripePublishableKey(),
     });
@@ -2085,68 +2084,40 @@ router.post('/billing/checkout', requireAuth, async (req: AuthenticatedRequest, 
 
     const billingInterval: BillingInterval = interval === 'annual' ? 'annual' : 'monthly';
     const sub = await getSubscription(userId);
+    const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
 
-    const requestedProvider = req.body?.provider || process.env.PAYMENT_PROVIDER || 'paddle';
-    if (requestedProvider === 'stripe') {
-      const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
-      const stripeParams = getStripeCheckoutParams({
-        plan,
-        interval: billingInterval,
-        customerEmail: userEmail,
-        customerId: sub.provider_customer_id || undefined,
-        userId,
-        baseUrl,
-      });
-
-      await createActivityLog(
-        userId,
-        'CHECKOUT_INITIATED',
-        `Initiated Stripe checkout for ${plan} (${billingInterval})`
-      );
-
-      return res.status(200).json({
-        success: true,
-        provider: 'stripe',
-        stripe_configured: isStripeConfigured(),
-        publishable_key: stripeParams.publishableKey,
-        price_id: stripeParams.priceId,
-        plan: stripeParams.plan,
-        interval: stripeParams.interval,
-        customer_email: stripeParams.customerEmail,
-        checkout_params: stripeParams,
-      });
-    }
-
-    const checkoutParams = getCheckoutParams(
+    const session = await createStripeCheckoutSession({
       userId,
-      userEmail,
+      customerEmail: userEmail,
       plan,
-      billingInterval,
-      sub.paddle_customer_id || sub.provider_customer_id
-    );
+      interval: billingInterval,
+      customerId: sub.stripe_customer_id || sub.provider_customer_id,
+      baseUrl,
+    });
 
     await createActivityLog(
       userId,
       'CHECKOUT_INITIATED',
-      `Initiated Paddle Sandbox checkout for ${plan} (${billingInterval})`
+      `Initiated Stripe checkout for ${plan} (${billingInterval})`
     );
 
     res.status(200).json({
       success: true,
-      paddle_configured: isPaddleConfigured(),
-      environment: checkoutParams.environment,
-      client_token: checkoutParams.clientToken,
-      price_id: checkoutParams.priceId,
-      plan: checkoutParams.plan,
-      interval: checkoutParams.interval,
-      customer_email: checkoutParams.customerEmail,
-      customer_id: checkoutParams.customerId,
-      custom_data: checkoutParams.customData,
-      checkout_params: checkoutParams,
+      provider: 'stripe',
+      stripe_configured: isStripeConfigured(),
+      url: session.url,
+      session_id: session.sessionId,
+      publishable_key: session.publishableKey,
+      price_id: session.priceId,
+      plan: session.plan,
+      interval: session.interval,
+      customer_email: userEmail,
+      checkout_params: session,
+      message: session.message,
     });
   } catch (err: any) {
-    console.error('[Paddle Checkout Error]', err);
-    res.status(500).json({ error: err.message || 'Failed to initiate Paddle checkout.' });
+    console.error('[Stripe Checkout Error]', err);
+    res.status(500).json({ error: err.message || 'Failed to initiate Stripe checkout.' });
   }
 });
 
@@ -2155,42 +2126,27 @@ router.post('/billing/portal', requireAuth, async (req: AuthenticatedRequest, re
   try {
     const userId = req.user!.id;
     const sub = await getSubscription(userId);
+    const customerId = sub.stripe_customer_id || sub.provider_customer_id;
+    const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
 
-    if (!isPaddleConfigured()) {
-      return res.status(503).json({
-        error: 'Paddle Sandbox billing is not configured. PADDLE_API_KEY or PADDLE_CLIENT_TOKEN is required.',
-        code: 'PADDLE_NOT_CONFIGURED',
-        paddle_configured: false,
-      });
+    if (customerId && isStripeConfigured()) {
+      const portalUrl = await createStripePortalSession(customerId, `${baseUrl}/?tab=billing`);
+      if (portalUrl) {
+        return res.status(200).json({
+          url: portalUrl,
+          message: 'Stripe Customer Portal session created.',
+        });
+      }
     }
-
-    const subId = sub.paddle_subscription_id || sub.provider_subscription_id;
-    if (!subId) {
-      return res.status(400).json({
-        error: 'No active Paddle subscription found for this account. Please subscribe to a paid plan first.',
-      });
-    }
-
-    let paddleSub = null;
-    try {
-      paddleSub = await getPaddleSubscription(subId);
-    } catch (e: any) {
-      console.warn('[Paddle Subscription Fetch Notice]:', e.message);
-    }
-
-    const updateUrl = paddleSub?.management_urls?.update_payment_method || null;
-    const cancelUrl = paddleSub?.management_urls?.cancel || null;
 
     res.status(200).json({
-      subscription_id: subId,
-      status: sub.status,
-      plan: sub.plan,
-      update_payment_method_url: updateUrl,
-      cancel_url: cancelUrl,
-      message: updateUrl ? 'Management URL available' : 'Paddle Sandbox subscription is active.',
+      url: null,
+      message: isStripeConfigured()
+        ? 'No active Stripe customer found. Please subscribe to a paid plan first.'
+        : 'Stripe Customer Portal is available when Stripe API keys are configured.',
     });
   } catch (err: any) {
-    console.error('[Paddle Portal Error]', err);
+    console.error('[Stripe Portal Error]', err);
     res.status(500).json({ error: err.message || 'Failed to fetch billing management details.' });
   }
 });
@@ -2205,19 +2161,16 @@ router.post('/billing/cancel', requireAuth, async (req: AuthenticatedRequest, re
       return res.status(400).json({ error: 'You are currently on the Free plan.' });
     }
 
-    const subId = sub.paddle_subscription_id || sub.provider_subscription_id;
-    if (subId) {
-      try {
-        await cancelPaddleSubscription(subId, 'next_billing_period');
-      } catch (err: any) {
-        console.warn('[Paddle Cancel API Warning]:', err.message);
-      }
+    const subId = sub.stripe_subscription_id || sub.provider_subscription_id;
+    if (subId && isStripeConfigured()) {
+      await cancelStripeSubscription(subId);
     }
 
     const updated = await upsertSubscription({
       user_id: userId,
       cancel_at_period_end: true,
       status: 'cancelled',
+      provider: 'stripe',
     });
 
     await createActivityLog(
@@ -2236,7 +2189,7 @@ router.post('/billing/cancel', requireAuth, async (req: AuthenticatedRequest, re
   }
 });
 
-// POST /api/billing/confirm-transaction (Verifies/Confirms completed Paddle checkout)
+// POST /api/billing/confirm-transaction (Verifies/Confirms completed Stripe checkout)
 const handleConfirmBilling = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
@@ -2247,20 +2200,6 @@ const handleConfirmBilling = async (req: AuthenticatedRequest, res: Response) =>
 
     let targetPlan: PlanTier = plan && (plan === 'GROWTH' || plan === 'STARTER') ? plan : 'STARTER';
     let targetInterval: BillingInterval = interval === 'annual' ? 'annual' : 'monthly';
-
-    // If subscription_id provided, query Paddle API to get accurate details
-    if (subId && isPaddleConfigured()) {
-      try {
-        const paddleSub = await getPaddleSubscription(subId);
-        if (paddleSub) {
-          const mapped = mapPaddlePriceToPlan(paddleSub.items?.[0]?.price?.id, paddleSub.custom_data);
-          targetPlan = mapped.plan;
-          targetInterval = mapped.interval;
-        }
-      } catch (err: any) {
-        console.warn('[Confirm Billing Paddle API Notice]:', err.message);
-      }
-    }
 
     const now = new Date();
     const periodEnd = new Date(
@@ -2274,11 +2213,11 @@ const handleConfirmBilling = async (req: AuthenticatedRequest, res: Response) =>
       plan: targetPlan,
       status: 'active',
       billing_interval: targetInterval,
-      provider: 'paddle',
+      provider: 'stripe',
       provider_customer_id: custId,
       provider_subscription_id: subId,
-      paddle_customer_id: custId,
-      paddle_subscription_id: subId,
+      stripe_customer_id: custId,
+      stripe_subscription_id: subId,
       current_period_start: now.toISOString(),
       current_period_end: periodEnd,
       cancel_at_period_end: false,
@@ -2287,7 +2226,7 @@ const handleConfirmBilling = async (req: AuthenticatedRequest, res: Response) =>
     await createActivityLog(
       userId,
       'SUBSCRIPTION_ACTIVATED',
-      `Confirmed active subscription to ${targetPlan} (${targetInterval}) via Paddle Sandbox`,
+      `Confirmed active subscription to ${targetPlan} (${targetInterval}) via Stripe`,
       { customerId: custId, subscriptionId: subId, transactionId: transaction_id }
     );
 
@@ -2312,7 +2251,7 @@ const handleConfirmBilling = async (req: AuthenticatedRequest, res: Response) =>
     });
   } catch (err: any) {
     console.error('[Confirm Billing Error]', err);
-    res.status(500).json({ error: err.message || 'Failed to confirm Paddle transaction.' });
+    res.status(500).json({ error: err.message || 'Failed to confirm Stripe transaction.' });
   }
 };
 
@@ -2381,7 +2320,7 @@ router.post('/billing/simulate', requireAuth, async (req: AuthenticatedRequest, 
         plan,
         status: status || 'active',
         billing_interval: interval || 'monthly',
-        provider: 'paddle',
+        provider: 'stripe',
         current_period_start: now.toISOString(),
         current_period_end: periodEnd,
         cancel_at_period_end: false,
@@ -2405,294 +2344,7 @@ router.post('/billing/simulate', requireAuth, async (req: AuthenticatedRequest, 
   }
 });
 
-// Shared Paddle Webhook Handler with Idempotency & Signature Verification
-const handlePaddleWebhook = async (req: Request, res: Response) => {
-  try {
-    // 1. Dynamic IP allowlist check against live Paddle CIDRs
-    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || req.ip || '';
-    const isAllowed = await isPaddleIpAllowed(clientIp);
-    const env = getPaddleEnvironment();
-
-    if (env === 'production' && !isAllowed) {
-      console.warn(`[Paddle Webhook] Rejected unauthorized IP: ${clientIp}`);
-      return res.status(403).send('Forbidden: IP not authorized for Paddle webhooks');
-    }
-
-    const signatureHeader = (req.headers['paddle-signature'] || req.headers['paddle_signature']) as string | undefined;
-    const rawBody = (req as any).rawBody || JSON.stringify(req.body);
-
-    try {
-      verifyPaddleWebhookSignature(rawBody, signatureHeader);
-    } catch (err: any) {
-      console.error('[Paddle Webhook Signature Verification Failed]:', err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    const event = parsePaddleWebhookEvent(rawBody);
-
-    // Webhook idempotency check
-    const isProcessed = await isWebhookEventProcessed(event.event_id);
-    if (isProcessed) {
-      console.log(`[Paddle Webhook] Event ${event.event_id} already processed. Skipping.`);
-      return res.status(200).json({ received: true, duplicate: true });
-    }
-
-    console.log(`[Paddle Webhook] Processing event: ${event.event_type} (${event.event_id})`);
-
-    switch (event.event_type) {
-      case 'subscription.created': {
-        const subData = event.data;
-        const subscriptionId = subData.id;
-        const customerId = subData.customer_id;
-        const customData = subData.custom_data;
-        const priceId = subData.items?.[0]?.price?.id;
-
-        const { plan, interval } = mapPaddlePriceToPlan(priceId, customData);
-        let userId = customData?.user_id;
-
-        if (!userId && customerId) {
-          const user = await getUserByPaddleCustomerId(customerId);
-          if (user) userId = user.id;
-        }
-
-        if (userId) {
-          const periodStart = subData.current_billing_period?.starts_at || new Date().toISOString();
-          const periodEnd = subData.current_billing_period?.ends_at ||
-            new Date(Date.now() + (interval === 'annual' ? 365 : 30) * 86400000).toISOString();
-
-          let status: import('./plans.js').SubscriptionStatus = 'active';
-          if (subData.status === 'past_due') status = 'past_due';
-          else if (subData.status === 'trialing') status = 'trialing';
-          else if (subData.status === 'canceled' || subData.status === 'cancelled') status = 'cancelled';
-          else if (subData.status === 'paused') status = 'past_due';
-
-          await upsertSubscription({
-            user_id: userId,
-            plan,
-            status,
-            billing_interval: interval,
-            provider: 'paddle',
-            provider_customer_id: customerId,
-            provider_subscription_id: subscriptionId,
-            paddle_customer_id: customerId,
-            paddle_subscription_id: subscriptionId,
-            current_period_start: periodStart,
-            current_period_end: periodEnd,
-            cancel_at_period_end: Boolean(subData.scheduled_change?.action === 'cancel'),
-          });
-
-          await createActivityLog(
-            userId,
-            'SUBSCRIPTION_ACTIVATED',
-            `Subscribed to ${plan} (${interval}) via Paddle Sandbox`,
-            { customerId, subscriptionId }
-          );
-
-          const targetUser = await getUserById(userId);
-          if (targetUser) {
-            const planCfg = PLAN_CONFIGS[plan];
-            const amountStr = interval === 'annual' ? `$${planCfg.priceAnnual}/yr` : `$${planCfg.priceMonthly}/mo`;
-            sendSubscriptionConfirmationEmail({
-              to: targetUser.email,
-              name: targetUser.name,
-              planName: planCfg.name,
-              billingInterval: interval === 'annual' ? 'Annual' : 'Monthly',
-              amountFormatted: amountStr,
-            }).catch(e => console.error('[Paddle Webhook Email Error]', e.message));
-          }
-        }
-        break;
-      }
-
-      case 'subscription.updated': {
-        const subData = event.data;
-        const subscriptionId = subData.id;
-        const customerId = subData.customer_id;
-        const customData = subData.custom_data;
-        const priceId = subData.items?.[0]?.price?.id;
-
-        let targetSub = await getSubscriptionByProviderSubId(subscriptionId);
-        if (!targetSub && customerId) {
-          targetSub = await getSubscriptionByCustomerId(customerId);
-        }
-        if (!targetSub && customData?.user_id) {
-          targetSub = await getSubscription(customData.user_id);
-        }
-
-        if (targetSub) {
-          const { plan, interval } = mapPaddlePriceToPlan(priceId, customData);
-
-          let status: import('./plans.js').SubscriptionStatus = 'active';
-          if (subData.status === 'past_due') status = 'past_due';
-          else if (subData.status === 'canceled' || subData.status === 'cancelled') status = 'cancelled';
-          else if (subData.status === 'trialing') status = 'trialing';
-          else if (subData.status === 'paused') status = 'past_due';
-
-          const periodStart = subData.current_billing_period?.starts_at || targetSub.current_period_start;
-          const periodEnd = subData.current_billing_period?.ends_at || targetSub.current_period_end;
-          const cancelAtPeriodEnd = subData.scheduled_change?.action === 'cancel';
-
-          await upsertSubscription({
-            user_id: targetSub.user_id,
-            plan,
-            status,
-            billing_interval: interval,
-            current_period_start: periodStart,
-            current_period_end: periodEnd,
-            cancel_at_period_end: cancelAtPeriodEnd,
-            provider: 'paddle',
-            provider_subscription_id: subscriptionId,
-            provider_customer_id: customerId,
-            paddle_subscription_id: subscriptionId,
-            paddle_customer_id: customerId,
-          });
-
-          await createActivityLog(
-            targetSub.user_id,
-            'SUBSCRIPTION_UPDATED',
-            `Subscription updated: ${plan} (${status})`,
-            { subscriptionId, status, cancelAtPeriodEnd }
-          );
-        }
-        break;
-      }
-
-      case 'subscription.canceled':
-      case 'subscription.cancelled': {
-        const subData = event.data;
-        const subscriptionId = subData.id;
-        const customerId = subData.customer_id;
-
-        let targetSub = await getSubscriptionByProviderSubId(subscriptionId);
-        if (!targetSub && customerId) {
-          targetSub = await getSubscriptionByCustomerId(customerId);
-        }
-
-        if (targetSub) {
-          // Safe downgrade: reset to FREE, keep all user invoices and clients intact
-          await upsertSubscription({
-            user_id: targetSub.user_id,
-            plan: 'FREE',
-            status: 'expired',
-            cancel_at_period_end: false,
-          });
-
-          await createActivityLog(
-            targetSub.user_id,
-            'SUBSCRIPTION_EXPIRED',
-            `Subscription ended. Reverted cleanly to Free tier without removing any user data.`
-          );
-
-          const targetUser = await getUserById(targetSub.user_id);
-          if (targetUser) {
-            sendSubscriptionCancelledEmail({
-              to: targetUser.email,
-              name: targetUser.name,
-              planName: targetSub.plan,
-            }).catch(e => console.error('[Paddle Webhook Cancel Email Error]', e.message));
-          }
-        }
-        break;
-      }
-
-      case 'subscription.past_due': {
-        const subData = event.data;
-        const subscriptionId = subData.id;
-        const customerId = subData.customer_id;
-
-        let targetSub = await getSubscriptionByProviderSubId(subscriptionId);
-        if (!targetSub && customerId) {
-          targetSub = await getSubscriptionByCustomerId(customerId);
-        }
-
-        if (targetSub) {
-          await upsertSubscription({
-            user_id: targetSub.user_id,
-            status: 'past_due',
-          });
-
-          await createActivityLog(
-            targetSub.user_id,
-            'PAYMENT_FAILED',
-            'Paddle subscription payment is past due. Status changed to past_due.',
-            { subscriptionId }
-          );
-
-          const targetUser = await getUserById(targetSub.user_id);
-          if (targetUser) {
-            sendPaymentFailureEmail({
-              to: targetUser.email,
-              name: targetUser.name,
-              planName: targetSub.plan,
-            }).catch(e => console.error('[Paddle Payment Failure Email Error]', e.message));
-          }
-        }
-        break;
-      }
-
-      case 'transaction.completed': {
-        const txData = event.data;
-        const customerId = txData.customer_id;
-        const subscriptionId = txData.subscription_id;
-        const customData = txData.custom_data;
-
-        let userId = customData?.user_id;
-        if (!userId && customerId) {
-          const user = await getUserByPaddleCustomerId(customerId);
-          if (user) userId = user.id;
-        }
-
-        if (userId && subscriptionId) {
-          const targetSub = await getSubscription(userId);
-          if (targetSub.status !== 'active') {
-            await upsertSubscription({
-              user_id: userId,
-              status: 'active',
-              paddle_subscription_id: subscriptionId,
-              paddle_customer_id: customerId,
-            });
-          }
-        }
-        break;
-      }
-
-      case 'transaction.payment_failed': {
-        const txData = event.data;
-        const customerId = txData.customer_id;
-        let targetSub = customerId ? await getSubscriptionByCustomerId(customerId) : null;
-
-        if (targetSub) {
-          await upsertSubscription({
-            user_id: targetSub.user_id,
-            status: 'past_due',
-          });
-
-          await createActivityLog(
-            targetSub.user_id,
-            'PAYMENT_FAILED',
-            'Paddle transaction payment failed.',
-            { transactionId: txData.id }
-          );
-        }
-        break;
-      }
-    }
-
-    // Record webhook event for idempotency
-    await recordProcessedWebhookEvent(event.event_id, event.event_type);
-
-    res.status(200).json({ received: true });
-  } catch (err: any) {
-    console.error('[Paddle Webhook Processing Error]', err);
-    res.status(500).json({ error: 'Internal webhook error' });
-  }
-};
-
-// Mount both standard /api/webhooks/paddle and legacy /api/billing/webhook
-router.post('/webhooks/paddle', handlePaddleWebhook);
-router.post('/billing/webhook', handlePaddleWebhook);
-
-// POST /api/webhooks/stripe (Stripe Webhook Handler)
+// POST /api/webhooks/stripe (Stripe Webhook Handler with Signature Verification & Idempotency)
 router.post('/webhooks/stripe', async (req: Request, res: Response) => {
   try {
     const rawBody = (req as any).rawBody || JSON.stringify(req.body);
@@ -2714,6 +2366,160 @@ router.post('/webhooks/stripe', async (req: Request, res: Response) => {
         return res.status(200).json({ received: true, duplicate: true });
       }
       await recordProcessedWebhookEvent(eventId, event.type || 'stripe.event');
+    }
+
+    const eventType = event?.type;
+    const dataObj = event?.data?.object;
+
+    switch (eventType) {
+      case 'checkout.session.completed': {
+        const userId = dataObj?.client_reference_id || dataObj?.metadata?.user_id;
+        const customerId = dataObj?.customer;
+        const subscriptionId = dataObj?.subscription;
+        const plan: PlanTier = (dataObj?.metadata?.plan as PlanTier) || 'STARTER';
+        const interval: BillingInterval = (dataObj?.metadata?.interval as BillingInterval) || 'monthly';
+
+        if (userId) {
+          const now = new Date();
+          const periodEnd = new Date(
+            interval === 'annual'
+              ? now.getTime() + 365 * 24 * 60 * 60 * 1000
+              : now.getTime() + 30 * 24 * 60 * 60 * 1000
+          ).toISOString();
+
+          await upsertSubscription({
+            user_id: userId,
+            plan,
+            status: 'active',
+            billing_interval: interval,
+            provider: 'stripe',
+            provider_customer_id: customerId || null,
+            provider_subscription_id: subscriptionId || null,
+            stripe_customer_id: customerId || null,
+            stripe_subscription_id: subscriptionId || null,
+            current_period_start: now.toISOString(),
+            current_period_end: periodEnd,
+            cancel_at_period_end: false,
+          });
+
+          await createActivityLog(
+            userId,
+            'SUBSCRIPTION_ACTIVATED',
+            `Subscribed to ${plan} (${interval}) via Stripe Checkout`,
+            { customerId, subscriptionId }
+          );
+
+          const targetUser = await getUserById(userId);
+          if (targetUser) {
+            const planCfg = PLAN_CONFIGS[plan];
+            const amountStr = interval === 'annual' ? `$${planCfg.priceAnnual}/yr` : `$${planCfg.priceMonthly}/mo`;
+            sendSubscriptionConfirmationEmail({
+              to: targetUser.email,
+              name: targetUser.name,
+              planName: planCfg.name,
+              billingInterval: interval === 'annual' ? 'Annual' : 'Monthly',
+              amountFormatted: amountStr,
+            }).catch((e) => console.error('[Stripe Confirmation Email Error]', e.message));
+          }
+        }
+        break;
+      }
+
+      case 'customer.subscription.updated': {
+        const customerId = dataObj?.customer;
+        const subscriptionId = dataObj?.id;
+        let targetSub = subscriptionId ? await getSubscriptionByProviderSubId(subscriptionId) : null;
+        if (!targetSub && customerId) {
+          targetSub = await getSubscriptionByCustomerId(customerId);
+        }
+
+        if (targetSub) {
+          const status = dataObj?.status === 'active' ? 'active' : dataObj?.status === 'past_due' ? 'past_due' : 'cancelled';
+          const cancelAtPeriodEnd = Boolean(dataObj?.cancel_at_period_end);
+
+          await upsertSubscription({
+            user_id: targetSub.user_id,
+            status,
+            cancel_at_period_end: cancelAtPeriodEnd,
+            provider: 'stripe',
+            provider_subscription_id: subscriptionId,
+            stripe_subscription_id: subscriptionId,
+          });
+
+          await createActivityLog(
+            targetSub.user_id,
+            'SUBSCRIPTION_UPDATED',
+            `Stripe subscription updated: ${targetSub.plan} (${status})`,
+            { subscriptionId, status, cancelAtPeriodEnd }
+          );
+        }
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        const customerId = dataObj?.customer;
+        const subscriptionId = dataObj?.id;
+        let targetSub = subscriptionId ? await getSubscriptionByProviderSubId(subscriptionId) : null;
+        if (!targetSub && customerId) {
+          targetSub = await getSubscriptionByCustomerId(customerId);
+        }
+
+        if (targetSub) {
+          await upsertSubscription({
+            user_id: targetSub.user_id,
+            plan: 'FREE',
+            status: 'expired',
+            cancel_at_period_end: false,
+            provider: 'stripe',
+          });
+
+          await createActivityLog(
+            targetSub.user_id,
+            'SUBSCRIPTION_EXPIRED',
+            'Subscription ended. Reverted cleanly to Free tier without removing user data.'
+          );
+
+          const targetUser = await getUserById(targetSub.user_id);
+          if (targetUser) {
+            sendSubscriptionCancelledEmail({
+              to: targetUser.email,
+              name: targetUser.name,
+              planName: targetSub.plan,
+            }).catch((e) => console.error('[Stripe Cancel Email Error]', e.message));
+          }
+        }
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const customerId = dataObj?.customer;
+        let targetSub = customerId ? await getSubscriptionByCustomerId(customerId) : null;
+
+        if (targetSub) {
+          await upsertSubscription({
+            user_id: targetSub.user_id,
+            status: 'past_due',
+            provider: 'stripe',
+          });
+
+          await createActivityLog(
+            targetSub.user_id,
+            'PAYMENT_FAILED',
+            'Stripe recurring payment failed. Subscription marked past_due.',
+            { customerId }
+          );
+
+          const targetUser = await getUserById(targetSub.user_id);
+          if (targetUser) {
+            sendPaymentFailureEmail({
+              to: targetUser.email,
+              name: targetUser.name,
+              planName: targetSub.plan,
+            }).catch((e) => console.error('[Stripe Payment Failure Email Error]', e.message));
+          }
+        }
+        break;
+      }
     }
 
     res.status(200).json({ received: true });
@@ -2743,11 +2549,10 @@ router.get('/settings/config', requireAuth, async (req: AuthenticatedRequest, re
         configured: Boolean(process.env.RESEND_API_KEY),
         from_email: process.env.RESEND_FROM_EMAIL || 'Receipto <billing@resend.dev>',
       },
-      paddle_service: {
-        configured: isPaddleConfigured(),
-        environment: getPaddleEnvironment(),
-        client_token: getPaddleClientToken() ? `${getPaddleClientToken().slice(0, 8)}...` : null,
-        webhook_configured: isPaddleWebhookConfigured(),
+      stripe_service: {
+        configured: isStripeConfigured(),
+        publishable_key: getStripePublishableKey(),
+        webhook_configured: isStripeWebhookConfigured(),
       },
       app_version: '1.2.0',
     });

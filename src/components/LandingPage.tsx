@@ -19,12 +19,15 @@ import {
   HelpCircle,
   Zap,
   Lock,
+  Menu,
+  X,
+  Shield,
+  LifeBuoy,
 } from 'lucide-react';
 import { PLAN_CONFIGS, PlanTier, BillingInterval } from '../plans.js';
 import type { User } from '../types.js';
 import { ReceiptoLogo } from './ReceiptoLogo.js';
 import { ThemeToggle } from './ThemeToggle.js';
-import { LifeBuoy } from 'lucide-react';
 
 interface LandingPageProps {
   currentUser: User | null;
@@ -45,6 +48,16 @@ export function LandingPage({
 }: LandingPageProps) {
   const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
   const [activeFaq, setActiveFaq] = useState<number | null>(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleLegalClick = (tab: 'terms' | 'privacy' | 'refund') => {
+    setMobileMenuOpen(false);
+    if (onNavigateLegal) {
+      onNavigateLegal(tab);
+    } else {
+      onOpenTerms();
+    }
+  };
 
   const faqs = [
     {
@@ -61,7 +74,7 @@ export function LandingPage({
     },
     {
       q: 'How does email verification protect my account?',
-      a: 'Every new registration is secured with a cryptographically generated 6-digit one-time code (OTP). This prevents fraudulent account registrations, protects your financial ledgers, and guarantees that only verified business owners can dispatch reminders.',
+      a: 'Every new registration is secured with verified business email authentication. This prevents fraudulent account registrations, protects your financial ledgers, and guarantees that only verified business owners can dispatch reminders.',
     },
     {
       q: 'Can I export my data for accounting or tax purposes?',
@@ -69,59 +82,192 @@ export function LandingPage({
     },
     {
       q: 'Can I upgrade, downgrade, or cancel anytime?',
-      a: 'Absolutely. Paid subscriptions are billed transparently via Paddle. You can upgrade or cancel your plan at any time with one click in your billing settings.',
+      a: 'Absolutely. Paid subscriptions are billed securely via Stripe. You can upgrade, change billing intervals, or cancel your plan at any time with one click in your billing settings.',
+    },
+    {
+      q: 'What is your refund policy?',
+      a: 'We offer a 14-day evaluation refund window for new paid subscriptions (Starter and Growth). You may cancel your subscription at any time without fees, and you will retain access through the end of your prepaid billing period.',
     },
   ];
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-indigo-500 selection:text-white transition-colors duration-200">
       {/* 1. Header / Navbar */}
-      <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-950/85 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 transition-colors">
+      <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4 mr-4 sm:mr-6">
+          {/* Logo */}
+          <div className="flex items-center gap-4 mr-3 sm:mr-6 shrink-0">
             <ReceiptoLogo size="md" showWordmark wordmarkClassName="text-xl font-black tracking-tight text-slate-900 dark:text-white" />
           </div>
 
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600 dark:text-slate-300">
-            <a href="#features" className="hover:text-indigo-600 dark:hover:text-white transition">Features</a>
-            <a href="#pricing" className="hover:text-indigo-600 dark:hover:text-white transition">Pricing</a>
-            <a href="#faq" className="hover:text-indigo-600 dark:hover:text-white transition">FAQ</a>
+          {/* Desktop Navigation Links */}
+          <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-xs xl:text-sm font-medium text-slate-600 dark:text-slate-300">
+            <a href="#features" className="hover:text-indigo-600 dark:hover:text-white transition focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1">
+              Features
+            </a>
+            <a href="#pricing" className="hover:text-indigo-600 dark:hover:text-white transition focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1">
+              Pricing
+            </a>
+            <a href="#faq" className="hover:text-indigo-600 dark:hover:text-white transition focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1">
+              FAQ
+            </a>
+
+            {/* Separator between app nav and legal links */}
+            <div className="h-4 w-px bg-slate-300 dark:bg-slate-800" />
+
+            {/* 3 Accessible Top Navigation Legal Links */}
+            <button
+              type="button"
+              id="top-nav-privacy-policy"
+              onClick={() => handleLegalClick('privacy')}
+              className="hover:text-indigo-600 dark:hover:text-white transition text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1 py-0.5 text-xs xl:text-sm font-medium whitespace-nowrap"
+            >
+              Privacy Policy
+            </button>
+            <button
+              type="button"
+              id="top-nav-terms-conditions"
+              onClick={() => handleLegalClick('terms')}
+              className="hover:text-indigo-600 dark:hover:text-white transition text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1 py-0.5 text-xs xl:text-sm font-medium whitespace-nowrap"
+            >
+              Terms and Conditions
+            </button>
+            <button
+              type="button"
+              id="top-nav-refund-policy"
+              onClick={() => handleLegalClick('refund')}
+              className="hover:text-indigo-600 dark:hover:text-white transition text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1 py-0.5 text-xs xl:text-sm font-medium whitespace-nowrap"
+            >
+              Refund Policy
+            </button>
           </nav>
 
-          <div className="flex items-center gap-2.5 sm:gap-3.5">
+          {/* Right Header Controls */}
+          <div className="flex items-center gap-2 sm:gap-3">
             {onOpenSupport && (
               <button
                 type="button"
                 id="btn-landing-support"
                 onClick={onOpenSupport}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800 transition"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800 transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <LifeBuoy className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                 <span>Support</span>
               </button>
             )}
+
             <ThemeToggle variant="compact" />
+
             {currentUser ? (
               <button
                 id="btn-nav-dashboard"
                 onClick={onGoToDashboard}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition shadow-lg shadow-indigo-600/25"
+                className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs sm:text-sm transition shadow-lg shadow-indigo-600/25 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
-                <span>Go to Dashboard</span>
+                <span>Dashboard</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             ) : (
               <button
                 id="btn-nav-get-started"
                 onClick={() => onOpenAuth('register')}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition shadow-lg shadow-indigo-600/25"
+                className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs sm:text-sm transition shadow-lg shadow-indigo-600/25 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <span>Get Started</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             )}
+
+            {/* Mobile Menu Toggle Button (visible on screens smaller than lg) */}
+            <button
+              type="button"
+              id="btn-mobile-nav-toggle"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden p-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+              aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={mobileMenuOpen}
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Navigation Drawer */}
+        {mobileMenuOpen && (
+          <div
+            id="mobile-nav-menu"
+            className="lg:hidden border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md px-4 pt-3 pb-5 space-y-1 animate-in fade-in slide-in-from-top-2 duration-150"
+          >
+            <a
+              href="#features"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900 transition"
+            >
+              Features
+            </a>
+            <a
+              href="#pricing"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900 transition"
+            >
+              Pricing
+            </a>
+            <a
+              href="#faq"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900 transition"
+            >
+              FAQ
+            </a>
+
+            <div className="pt-2 pb-1 border-t border-slate-200 dark:border-slate-800 my-1">
+              <span className="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                Legal &amp; Policies
+              </span>
+            </div>
+
+            <button
+              type="button"
+              id="mobile-nav-privacy-policy"
+              onClick={() => handleLegalClick('privacy')}
+              className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 transition"
+            >
+              Privacy Policy
+            </button>
+            <button
+              type="button"
+              id="mobile-nav-terms-conditions"
+              onClick={() => handleLegalClick('terms')}
+              className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 transition"
+            >
+              Terms and Conditions
+            </button>
+            <button
+              type="button"
+              id="mobile-nav-refund-policy"
+              onClick={() => handleLegalClick('refund')}
+              className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 transition"
+            >
+              Refund Policy
+            </button>
+
+            {onOpenSupport && (
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onOpenSupport();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-900 transition"
+                >
+                  <LifeBuoy className="w-4 h-4" />
+                  <span>Contact Support</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
       {/* 2. Hero Section */}
@@ -253,15 +399,15 @@ export function LandingPage({
             <div className="w-12 h-12 rounded-xl bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-700/60 flex items-center justify-center text-rose-600 dark:text-rose-400 mb-4">
               <Lock className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Bank-Grade Security &amp; OTP</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Bank-Grade Tenant Security</h3>
             <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              Complete tenant data isolation, encrypted password hashes, and cryptographically verified 6-digit email authentication.
+              Complete tenant data isolation, encrypted credentials, and secure verified business email authentication.
             </p>
           </div>
         </div>
       </section>
 
-      {/* 5. How It Works Section */}
+      {/* 4. How It Works Section */}
       <section className="py-20 bg-slate-100/70 dark:bg-slate-900/50 border-y border-slate-200 dark:border-slate-800 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-16">
@@ -307,7 +453,7 @@ export function LandingPage({
         </div>
       </section>
 
-      {/* 6. Pricing Section (Directly linked to backend PLAN_CONFIGS) */}
+      {/* 5. Pricing Section (Directly linked to backend PLAN_CONFIGS) */}
       <section id="pricing" className="py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-12">
           <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-4">
@@ -427,7 +573,7 @@ export function LandingPage({
         </div>
       </section>
 
-      {/* 7. FAQ Accordion Section */}
+      {/* 6. FAQ Accordion Section */}
       <section id="faq" className="py-20 bg-slate-50 dark:bg-slate-900/40 border-t border-slate-200 dark:border-slate-800 transition-colors">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -435,7 +581,7 @@ export function LandingPage({
               Frequently Asked Questions
             </h2>
             <p className="text-slate-600 dark:text-slate-400 text-sm">
-              Have questions about Receipto? Everything you need to know about our platform and security.
+              Have questions about Receipto? Everything you need to know about our platform, payments, and security.
             </p>
           </div>
 
@@ -471,7 +617,7 @@ export function LandingPage({
         </div>
       </section>
 
-      {/* 8. Bottom CTA Banner */}
+      {/* 7. Bottom CTA Banner */}
       <section className="py-16 bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-900/80 dark:to-slate-950 border-t border-slate-200 dark:border-slate-800 transition-colors">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-4">
@@ -503,7 +649,7 @@ export function LandingPage({
         </div>
       </section>
 
-      {/* 5. Professional Footer */}
+      {/* 8. Professional Footer */}
       <footer className="bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800/80 py-12 text-slate-600 dark:text-slate-400 text-xs transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
@@ -525,25 +671,25 @@ export function LandingPage({
               </button>
             )}
             <button
-              onClick={() => (onNavigateLegal ? onNavigateLegal('terms') : onOpenTerms())}
+              onClick={() => handleLegalClick('terms')}
               className="hover:text-slate-900 dark:hover:text-white transition underline-offset-4 hover:underline text-xs"
             >
-              Terms of Service
+              Terms and Conditions
             </button>
             <button
-              onClick={() => (onNavigateLegal ? onNavigateLegal('privacy') : onOpenTerms())}
+              onClick={() => handleLegalClick('privacy')}
               className="hover:text-slate-900 dark:hover:text-white transition underline-offset-4 hover:underline text-xs"
             >
               Privacy Policy
             </button>
             <button
-              onClick={() => (onNavigateLegal ? onNavigateLegal('refund') : onOpenTerms())}
+              onClick={() => handleLegalClick('refund')}
               className="hover:text-slate-900 dark:hover:text-white transition underline-offset-4 hover:underline text-xs"
             >
-              Refund &amp; Cancellation Policy
+              Refund Policy
             </button>
             <span className="text-slate-400 dark:text-slate-500 text-xs">
-              Billed via Paddle.com (Merchant of Record)
+              Secure payments powered by Stripe
             </span>
             <span className="text-slate-400 dark:text-slate-500 text-xs">&copy; {new Date().getFullYear()} Receipto.</span>
           </div>
