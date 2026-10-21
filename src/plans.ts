@@ -1,8 +1,8 @@
 export type PlanTier = 'FREE' | 'STARTER' | 'GROWTH';
 export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'cancelled' | 'expired';
 export type BillingInterval = 'monthly' | 'annual';
-export type SubscriptionProvider = 'paddle' | 'manual' | 'demo';
-export type AccessMode = 'paddle' | 'owner_demo' | 'free';
+export type SubscriptionProvider = 'stripe' | 'manual' | 'demo';
+export type AccessMode = 'stripe' | 'owner_demo' | 'free';
 
 export interface PlanLimits {
   maxClients: number | null; // null represents unlimited

@@ -1,24 +1,22 @@
 /**
- * Stripe Billing Adapter (Configurable via Environment Variables)
+ * Stripe Billing Adapter for Receipto
  * 
- * Supports Stripe Checkout, customer management, and webhook verification
- * alongside Paddle. All keys and secrets are loaded strictly from environment variables.
+ * Exclusively provides Stripe Checkout, Customer Portal, Webhook Signature Verification,
+ * and Subscription Management. All secrets are read strictly from environment variables.
  */
 
 import crypto from 'crypto';
 import type { PlanTier, BillingInterval } from './plans.js';
 
-export interface StripeCheckoutParams {
-  provider: 'stripe';
+export interface StripeCheckoutResult {
+  url: string | null;
+  sessionId: string;
   publishableKey: string;
   priceId: string;
   plan: PlanTier;
   interval: BillingInterval;
-  customerEmail?: string;
-  customerId?: string;
-  clientReferenceId?: string;
-  successUrl: string;
-  cancelUrl: string;
+  mode: 'live' | 'test_mock';
+  message?: string;
 }
 
 export function isStripeConfigured(): boolean {
@@ -33,6 +31,10 @@ export function isStripeWebhookConfigured(): boolean {
 
 export function getStripePublishableKey(): string {
   return process.env.STRIPE_PUBLISHABLE_KEY?.trim() || '';
+}
+
+export function getStripeSecretKey(): string {
+  return process.env.STRIPE_SECRET_KEY?.trim() || '';
 }
 
 export function getStripePriceId(plan: PlanTier, interval: BillingInterval): string | null {
@@ -53,28 +55,141 @@ export function getStripePriceId(plan: PlanTier, interval: BillingInterval): str
   return null;
 }
 
-export function getStripeCheckoutParams(options: {
+/**
+ * Creates a Stripe Checkout Session via Stripe REST API.
+ * If STRIPE_SECRET_KEY is configured, calls Stripe API; otherwise returns test sandbox session.
+ */
+export async function createStripeCheckoutSession(options: {
+  userId: string;
+  customerEmail: string;
   plan: PlanTier;
   interval: BillingInterval;
-  customerEmail?: string;
-  customerId?: string;
-  userId: string;
+  customerId?: string | null;
   baseUrl: string;
-}): StripeCheckoutParams {
-  const priceId = getStripePriceId(options.plan, options.interval) || `price_mock_${options.plan.toLowerCase()}_${options.interval}`;
-  
+}): Promise<StripeCheckoutResult> {
+  const priceId = getStripePriceId(options.plan, options.interval);
+  const successUrl = `${options.baseUrl}/?billing_success=true&plan=${options.plan}&interval=${options.interval}&session_id={CHECKOUT_SESSION_ID}`;
+  const cancelUrl = `${options.baseUrl}/?billing_cancelled=true`;
+  const publishableKey = getStripePublishableKey();
+
+  if (isStripeConfigured() && priceId) {
+    const params = new URLSearchParams();
+    params.append('mode', 'subscription');
+    params.append('payment_method_types[0]', 'card');
+    params.append('line_items[0][price]', priceId);
+    params.append('line_items[0][quantity]', '1');
+    params.append('client_reference_id', options.userId);
+    params.append('success_url', successUrl);
+    params.append('cancel_url', cancelUrl);
+    params.append('metadata[user_id]', options.userId);
+    params.append('metadata[plan]', options.plan);
+    params.append('metadata[interval]', options.interval);
+
+    if (options.customerId) {
+      params.append('customer', options.customerId);
+    } else if (options.customerEmail) {
+      params.append('customer_email', options.customerEmail);
+    }
+
+    const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${getStripeSecretKey()}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error?.message || 'Stripe API checkout session creation failed.');
+    }
+
+    return {
+      url: data.url,
+      sessionId: data.id,
+      publishableKey,
+      priceId,
+      plan: options.plan,
+      interval: options.interval,
+      mode: 'live',
+    };
+  }
+
+  // Graceful test fallback when API keys are not yet configured in environment
+  const mockSessionId = `cs_test_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const mockUrl = `${options.baseUrl}/?billing_success=true&plan=${options.plan}&interval=${options.interval}&session_id=${mockSessionId}&test_mode=true`;
+
   return {
-    provider: 'stripe',
-    publishableKey: getStripePublishableKey(),
-    priceId,
+    url: mockUrl,
+    sessionId: mockSessionId,
+    publishableKey: publishableKey || 'pk_test_placeholder',
+    priceId: priceId || `price_${options.plan.toLowerCase()}_${options.interval}`,
     plan: options.plan,
     interval: options.interval,
-    customerEmail: options.customerEmail,
-    customerId: options.customerId,
-    clientReferenceId: options.userId,
-    successUrl: `${options.baseUrl}/?billing_success=true&provider=stripe`,
-    cancelUrl: `${options.baseUrl}/?billing_cancelled=true&provider=stripe`,
+    mode: 'test_mock',
+    message: isStripeConfigured()
+      ? `Stripe price ID for ${options.plan} (${options.interval}) is not set in environment.`
+      : 'Stripe API keys are not configured in environment. Using test mode simulation.',
   };
+}
+
+/**
+ * Creates a Stripe Customer Portal session for managing or cancelling subscriptions
+ */
+export async function createStripePortalSession(customerId: string, returnUrl: string): Promise<string | null> {
+  if (!isStripeConfigured() || !customerId) return null;
+
+  try {
+    const params = new URLSearchParams();
+    params.append('customer', customerId);
+    params.append('return_url', returnUrl);
+
+    const res = await fetch('https://api.stripe.com/v1/billing_portal/sessions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${getStripeSecretKey()}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      console.warn('[Stripe Portal API Notice]:', data.error?.message);
+      return null;
+    }
+    return data.url || null;
+  } catch (err: any) {
+    console.error('[Stripe Portal Error]', err.message);
+    return null;
+  }
+}
+
+/**
+ * Cancels a Stripe subscription at period end
+ */
+export async function cancelStripeSubscription(subscriptionId: string): Promise<boolean> {
+  if (!isStripeConfigured() || !subscriptionId) return false;
+
+  try {
+    const params = new URLSearchParams();
+    params.append('cancel_at_period_end', 'true');
+
+    const res = await fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${getStripeSecretKey()}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+
+    return res.ok;
+  } catch (err: any) {
+    console.error('[Stripe Cancel Error]', err.message);
+    return false;
+  }
 }
 
 /**

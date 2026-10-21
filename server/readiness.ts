@@ -7,7 +7,7 @@ export type ReadinessStatus = 'CONFIGURED' | 'MISSING' | 'INVALID FORMAT' | 'NOT
 
 export interface EnvCheckItem {
   key: string;
-  category: 'DATABASE' | 'SECURITY' | 'EMAIL' | 'PADDLE' | 'OWNER_DEMO';
+  category: 'DATABASE' | 'SECURITY' | 'EMAIL' | 'STRIPE' | 'OWNER_DEMO';
   status: ReadinessStatus;
   description: string;
   recommendation?: string;
@@ -15,7 +15,7 @@ export interface EnvCheckItem {
 
 export interface ProductionReadinessReport {
   overall_ready: boolean;
-  environment: 'production' | 'sandbox' | 'development';
+  environment: 'production' | 'test' | 'development';
   timestamp: string;
   summary: {
     total: number;
@@ -27,11 +27,8 @@ export interface ProductionReadinessReport {
 }
 
 export function evaluateProductionReadiness(): ProductionReadinessReport {
-  const env =
-    process.env.PADDLE_ENVIRONMENT?.trim().toLowerCase() ||
-    process.env.PADDLE_ENV?.trim().toLowerCase() ||
-    'sandbox';
-  const isProduction = env === 'production' || env === 'live';
+  const stripeKey = process.env.STRIPE_SECRET_KEY?.trim() || '';
+  const isProduction = stripeKey.startsWith('sk_live_') || process.env.NODE_ENV === 'production';
 
   const checks: EnvCheckItem[] = [];
 
@@ -157,188 +154,165 @@ export function evaluateProductionReadiness(): ProductionReadinessReport {
     });
   }
 
-  // 5. PADDLE_ENVIRONMENT
-  const paddleEnvVal =
-    process.env.PADDLE_ENVIRONMENT?.trim().toLowerCase() ||
-    process.env.PADDLE_ENV?.trim().toLowerCase() ||
-    'sandbox';
-  if (paddleEnvVal !== 'production' && paddleEnvVal !== 'sandbox' && paddleEnvVal !== 'live') {
+  // 5. STRIPE_SECRET_KEY
+  const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
+  if (!secretKey) {
     checks.push({
-      key: 'PADDLE_ENVIRONMENT',
-      category: 'PADDLE',
-      status: 'INVALID FORMAT',
-      description: 'PADDLE_ENVIRONMENT must be either "production" or "sandbox".',
-      recommendation: 'Set PADDLE_ENVIRONMENT="production" for live billing or "sandbox" for test mode.',
-    });
-  } else {
-    checks.push({
-      key: 'PADDLE_ENVIRONMENT',
-      category: 'PADDLE',
-      status: 'CONFIGURED',
-      description: `Paddle active environment: ${paddleEnvVal}.`,
-    });
-  }
-
-  // 6. PADDLE_CLIENT_TOKEN
-  const clientToken = process.env.PADDLE_CLIENT_TOKEN?.trim();
-  const tokenPrefix = isProduction ? 'live_' : 'test_';
-  if (!clientToken) {
-    checks.push({
-      key: 'PADDLE_CLIENT_TOKEN',
-      category: 'PADDLE',
+      key: 'STRIPE_SECRET_KEY',
+      category: 'STRIPE',
       status: 'MISSING',
-      description: 'Public client-side token for initializing the Paddle.js checkout library.',
-      recommendation: `Generate a client-side token in the Paddle Dashboard (${tokenPrefix}...).`,
+      description: 'Secret API key for server-to-server Stripe operations.',
+      recommendation: 'Create a Stripe account and copy your secret key (sk_test_... or sk_live_...).',
     });
-  } else if (!clientToken.startsWith(tokenPrefix)) {
+  } else if (!secretKey.startsWith('sk_test_') && !secretKey.startsWith('sk_live_')) {
     checks.push({
-      key: 'PADDLE_CLIENT_TOKEN',
-      category: 'PADDLE',
+      key: 'STRIPE_SECRET_KEY',
+      category: 'STRIPE',
       status: 'INVALID FORMAT',
-      description: `Client token prefix mismatch: expected "${tokenPrefix}" for ${env} environment.`,
-      recommendation: `Provide a client token starting with "${tokenPrefix}" for ${env} mode.`,
+      description: 'Stripe secret key must start with "sk_test_" or "sk_live_".',
+      recommendation: 'Copy the secret key directly from the Stripe Dashboard > Developers > API keys.',
     });
   } else {
     checks.push({
-      key: 'PADDLE_CLIENT_TOKEN',
-      category: 'PADDLE',
+      key: 'STRIPE_SECRET_KEY',
+      category: 'STRIPE',
       status: 'CONFIGURED',
-      description: 'Paddle client token format matches active environment.',
+      description: 'Stripe secret key is configured.',
     });
   }
 
-  // 7. PADDLE_API_KEY
-  const apiKey = process.env.PADDLE_API_KEY?.trim();
-  if (!apiKey) {
+  // 6. STRIPE_PUBLISHABLE_KEY
+  const pubKey = process.env.STRIPE_PUBLISHABLE_KEY?.trim();
+  if (!pubKey) {
     checks.push({
-      key: 'PADDLE_API_KEY',
-      category: 'PADDLE',
+      key: 'STRIPE_PUBLISHABLE_KEY',
+      category: 'STRIPE',
       status: 'MISSING',
-      description: 'Secret API key for server-to-server Paddle Billing operations.',
-      recommendation: 'Generate an API key in Paddle Dashboard under Developer Tools.',
+      description: 'Public publishable key for client-side Stripe checkout.',
+      recommendation: 'Copy your publishable key (pk_test_... or pk_live_...) from Stripe Dashboard.',
     });
-  } else if (!apiKey.startsWith('paddlesecret_') && apiKey.length < 20) {
+  } else if (!pubKey.startsWith('pk_test_') && !pubKey.startsWith('pk_live_')) {
     checks.push({
-      key: 'PADDLE_API_KEY',
-      category: 'PADDLE',
+      key: 'STRIPE_PUBLISHABLE_KEY',
+      category: 'STRIPE',
       status: 'INVALID FORMAT',
-      description: 'Paddle API key appears truncated or malformed.',
-      recommendation: 'Copy the full API key from the Paddle developer dashboard.',
+      description: 'Stripe publishable key must start with "pk_test_" or "pk_live_".',
+      recommendation: 'Copy the publishable key from Stripe Dashboard > Developers > API keys.',
     });
   } else {
     checks.push({
-      key: 'PADDLE_API_KEY',
-      category: 'PADDLE',
+      key: 'STRIPE_PUBLISHABLE_KEY',
+      category: 'STRIPE',
       status: 'CONFIGURED',
-      description: 'Paddle server API key is configured.',
+      description: 'Stripe publishable key is configured.',
     });
   }
 
-  // 8. PADDLE_WEBHOOK_SECRET
-  const webhookSecret = process.env.PADDLE_WEBHOOK_SECRET?.trim();
+  // 7. STRIPE_WEBHOOK_SECRET
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
   if (!webhookSecret) {
     checks.push({
-      key: 'PADDLE_WEBHOOK_SECRET',
-      category: 'PADDLE',
+      key: 'STRIPE_WEBHOOK_SECRET',
+      category: 'STRIPE',
       status: 'MISSING',
-      description: 'Secret signing key for cryptographic verification of Paddle webhook notifications.',
-      recommendation: 'Create a webhook endpoint in Paddle and copy the notification secret key.',
+      description: 'Secret signing key for cryptographic verification of Stripe webhooks.',
+      recommendation: 'Create a webhook endpoint pointing to /api/webhooks/stripe and copy the signing secret (whsec_...).',
     });
-  } else if (!webhookSecret.startsWith('pdl_ntf_set_') && !webhookSecret.startsWith('pdl_') && webhookSecret.length < 15) {
+  } else if (!webhookSecret.startsWith('whsec_')) {
     checks.push({
-      key: 'PADDLE_WEBHOOK_SECRET',
-      category: 'PADDLE',
+      key: 'STRIPE_WEBHOOK_SECRET',
+      category: 'STRIPE',
       status: 'INVALID FORMAT',
-      description: 'Paddle notification secret format is unrecognized (expected pdl_ntf_set_...).',
-      recommendation: 'Copy the notification secret key directly from the notification destination setting.',
+      description: 'Stripe webhook signing secret must start with "whsec_".',
+      recommendation: 'Copy the signing secret from your Stripe Webhook endpoint page.',
     });
   } else {
     checks.push({
-      key: 'PADDLE_WEBHOOK_SECRET',
-      category: 'PADDLE',
+      key: 'STRIPE_WEBHOOK_SECRET',
+      category: 'STRIPE',
       status: 'CONFIGURED',
-      description: 'Paddle webhook signing secret is configured.',
+      description: 'Stripe webhook signing secret is configured.',
     });
   }
 
-  // 9. Plan Price IDs
-  const starterMonthly = process.env.PADDLE_STARTER_MONTHLY_PRICE_ID?.trim();
-  const starterYearly = process.env.PADDLE_STARTER_YEARLY_PRICE_ID?.trim();
-  const growthMonthly = process.env.PADDLE_GROWTH_MONTHLY_PRICE_ID?.trim();
-  const growthYearly = process.env.PADDLE_GROWTH_YEARLY_PRICE_ID?.trim();
+  // 8. Plan Price IDs
+  const starterMonthly = process.env.STRIPE_STARTER_MONTHLY_PRICE_ID?.trim();
+  const starterYearly = process.env.STRIPE_STARTER_YEARLY_PRICE_ID?.trim();
+  const growthMonthly = process.env.STRIPE_GROWTH_MONTHLY_PRICE_ID?.trim();
+  const growthYearly = process.env.STRIPE_GROWTH_YEARLY_PRICE_ID?.trim();
 
   const priceConfigs = [
-    { key: 'PADDLE_STARTER_MONTHLY_PRICE_ID', val: starterMonthly, desc: 'Starter Monthly price' },
-    { key: 'PADDLE_STARTER_YEARLY_PRICE_ID', val: starterYearly, desc: 'Starter Yearly price' },
-    { key: 'PADDLE_GROWTH_MONTHLY_PRICE_ID', val: growthMonthly, desc: 'Growth Monthly price' },
-    { key: 'PADDLE_GROWTH_YEARLY_PRICE_ID', val: growthYearly, desc: 'Growth Yearly price' },
+    { key: 'STRIPE_STARTER_MONTHLY_PRICE_ID', val: starterMonthly, desc: 'Starter Monthly recurring price' },
+    { key: 'STRIPE_STARTER_YEARLY_PRICE_ID', val: starterYearly, desc: 'Starter Yearly recurring price' },
+    { key: 'STRIPE_GROWTH_MONTHLY_PRICE_ID', val: growthMonthly, desc: 'Growth Monthly recurring price' },
+    { key: 'STRIPE_GROWTH_YEARLY_PRICE_ID', val: growthYearly, desc: 'Growth Yearly recurring price' },
   ];
 
   for (const p of priceConfigs) {
     if (!p.val) {
       checks.push({
         key: p.key,
-        category: 'PADDLE',
+        category: 'STRIPE',
         status: 'MISSING',
-        description: `${p.desc} ID from Paddle product catalog.`,
-        recommendation: `Create price for ${p.desc} in Paddle and set ${p.key}=pri_...`,
+        description: `Stripe Price ID for ${p.desc}.`,
+        recommendation: `Create a recurring price in Stripe Dashboard > Product Catalog and set ${p.key}.`,
       });
-    } else if (!p.val.startsWith('pri_')) {
+    } else if (!p.val.startsWith('price_')) {
       checks.push({
         key: p.key,
-        category: 'PADDLE',
+        category: 'STRIPE',
         status: 'INVALID FORMAT',
-        description: `${p.key} must begin with "pri_".`,
-        recommendation: `Verify the Price ID from Paddle Catalog (starts with pri_).`,
+        description: `Stripe Price ID for ${p.desc} must start with "price_".`,
+        recommendation: `Verify that ${p.key} starts with "price_" (found: "${p.val}").`,
       });
     } else {
       checks.push({
         key: p.key,
-        category: 'PADDLE',
+        category: 'STRIPE',
         status: 'CONFIGURED',
-        description: `${p.desc} configured.`,
+        description: `Stripe Price ID for ${p.desc} is configured.`,
       });
     }
   }
 
-  // 10. OWNER_DEMO_EMAIL
-  const ownerEmail = process.env.OWNER_DEMO_EMAIL?.trim();
-  if (!ownerEmail) {
-    checks.push({
-      key: 'OWNER_DEMO_EMAIL',
-      category: 'OWNER_DEMO',
-      status: 'MISSING',
-      description: 'Email for owner/founder to test unlocked features.',
-      recommendation: 'Set OWNER_DEMO_EMAIL to your personal email to enable owner controls.',
-    });
-  } else {
-    checks.push({
-      key: 'OWNER_DEMO_EMAIL',
-      category: 'OWNER_DEMO',
-      status: 'CONFIGURED',
-      description: `Owner demo controls active for ${ownerEmail}.`,
-    });
+  // 9. OWNER_DEMO_EMAIL
+  const ownerDemo = process.env.OWNER_DEMO_EMAIL?.trim();
+  if (ownerDemo) {
+    if (!ownerDemo.includes('@')) {
+      checks.push({
+        key: 'OWNER_DEMO_EMAIL',
+        category: 'OWNER_DEMO',
+        status: 'INVALID FORMAT',
+        description: 'OWNER_DEMO_EMAIL must be a valid email address.',
+        recommendation: 'Provide a valid email address for owner demo access.',
+      });
+    } else {
+      checks.push({
+        key: 'OWNER_DEMO_EMAIL',
+        category: 'OWNER_DEMO',
+        status: 'CONFIGURED',
+        description: 'Owner demo account switcher is enabled for authorized email.',
+      });
+    }
   }
 
-  const configured = checks.filter((c) => c.status === 'CONFIGURED').length;
   const missing = checks.filter((c) => c.status === 'MISSING').length;
-  const invalid_format = checks.filter((c) => c.status === 'INVALID FORMAT').length;
+  const invalidFormat = checks.filter((c) => c.status === 'INVALID FORMAT').length;
+  const configured = checks.filter((c) => c.status === 'CONFIGURED').length;
 
-  // Essential keys that must be configured and valid for overall_ready: true
   const requiredKeys = ['FIREBASE_CONFIG', 'SESSION_SECRET'];
-  const overallReady = requiredKeys.every(
-    (k) => checks.find((c) => c.key === k)?.status === 'CONFIGURED'
-  );
+  const requiredChecks = checks.filter((c) => requiredKeys.includes(c.key));
+  const overallReady = requiredChecks.every((c) => c.status === 'CONFIGURED');
 
   return {
     overall_ready: overallReady,
-    environment: env as any,
+    environment: isProduction ? 'production' : 'test',
     timestamp: new Date().toISOString(),
     summary: {
       total: checks.length,
       configured,
       missing,
-      invalid_format,
+      invalid_format: invalidFormat,
     },
     checks,
   };

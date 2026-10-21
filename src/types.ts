@@ -52,9 +52,8 @@ export interface SubscriptionDetails {
   access_mode?: import('./plans.js').AccessMode;
   billing_provider?: import('./plans.js').SubscriptionProvider;
   owner_demo_available_plans?: import('./plans.js').PlanTier[];
-  paddle_configured?: boolean;
-  paddle_env?: string;
-  paddle_client_token?: string;
+  stripe_configured?: boolean;
+  stripe_publishable_key?: string;
   success?: boolean;
   message?: string;
 }
@@ -70,7 +69,7 @@ export interface User {
   terms_accepted_at?: string;
   terms_version?: string;
   last_login_at?: string | null;
-  paddle_customer_id?: string | null;
+  stripe_customer_id?: string | null;
   created_at: string;
   updated_at?: string;
 }
@@ -191,7 +190,7 @@ export interface AdminDashboardStats {
   system_health: {
     database: 'PASS' | 'FAIL';
     email: 'PASS' | 'NOT CONFIGURED' | 'FAIL';
-    paddle: 'PASS' | 'NOT CONFIGURED';
+    stripe: 'PASS' | 'NOT CONFIGURED';
     worker: 'PASS' | 'WARNING' | 'FAIL';
   };
 }
@@ -223,8 +222,8 @@ export interface AdminSubscriptionItem {
   provider: import('./plans.js').SubscriptionProvider;
   provider_customer_id: string | null;
   provider_subscription_id: string | null;
-  paddle_customer_id?: string | null;
-  paddle_subscription_id?: string | null;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
   current_period_start: string;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
@@ -246,12 +245,12 @@ export interface AdminSystemHealth {
     from_email: string;
     details?: string;
   };
-  paddle: {
+  stripe: {
     status: 'PASS' | 'NOT CONFIGURED' | 'FAIL';
     configured: boolean;
     webhook_configured: boolean;
     price_ids_configured: boolean;
-    environment: string;
+    publishable_key_configured: boolean;
   };
   application: {
     status: 'PASS';

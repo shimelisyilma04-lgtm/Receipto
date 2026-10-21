@@ -32,12 +32,10 @@ import {
   type PlanConfig,
 } from './plans.js';
 import {
-  isPaddleConfigured,
-  isPaddleWebhookConfigured,
-  getPaddleEnvironment,
-  getPaddlePriceId,
-  getPaddleClientToken,
-} from './paddle.js';
+  isStripeConfigured,
+  isStripeWebhookConfigured,
+  getStripePublishableKey,
+} from './stripe.js';
 
 // Synchronous lock to serialize concurrent write operations
 class AsyncKeyLock {
@@ -933,8 +931,8 @@ export async function getSubscription(userId: string): Promise<Subscription> {
     provider: 'manual',
     provider_customer_id: null,
     provider_subscription_id: null,
-    paddle_customer_id: null,
-    paddle_subscription_id: null,
+    stripe_customer_id: null,
+    stripe_subscription_id: null,
     current_period_start: now,
     current_period_end: null,
     cancel_at_period_end: false,
@@ -964,8 +962,8 @@ export async function upsertSubscription(
     if (data.provider) existing.provider = data.provider;
     if (data.provider_customer_id !== undefined) existing.provider_customer_id = data.provider_customer_id;
     if (data.provider_subscription_id !== undefined) existing.provider_subscription_id = data.provider_subscription_id;
-    if (data.paddle_customer_id !== undefined) existing.paddle_customer_id = data.paddle_customer_id;
-    if (data.paddle_subscription_id !== undefined) existing.paddle_subscription_id = data.paddle_subscription_id;
+    if (data.stripe_customer_id !== undefined) existing.stripe_customer_id = data.stripe_customer_id;
+    if (data.stripe_subscription_id !== undefined) existing.stripe_subscription_id = data.stripe_subscription_id;
     if (data.current_period_end !== undefined) existing.current_period_end = data.current_period_end;
     if (data.cancel_at_period_end !== undefined) existing.cancel_at_period_end = data.cancel_at_period_end;
     existing.updated_at = now;
@@ -979,11 +977,11 @@ export async function upsertSubscription(
     plan: data.plan || 'FREE',
     status: data.status || 'active',
     billing_interval: data.billing_interval || 'monthly',
-    provider: data.provider || 'paddle',
+    provider: data.provider || 'stripe',
     provider_customer_id: data.provider_customer_id || null,
     provider_subscription_id: data.provider_subscription_id || null,
-    paddle_customer_id: data.paddle_customer_id || null,
-    paddle_subscription_id: data.paddle_subscription_id || null,
+    stripe_customer_id: data.stripe_customer_id || null,
+    stripe_subscription_id: data.stripe_subscription_id || null,
     current_period_start: now,
     current_period_end: data.current_period_end || null,
     cancel_at_period_end: data.cancel_at_period_end || false,
@@ -1134,7 +1132,7 @@ export async function getSubscriptionByCustomerId(customerId: string): Promise<S
   reloadLocalStore();
   return (
     memoryStore.subscriptions.find(
-      (s) => s.provider_customer_id === customerId || s.paddle_customer_id === customerId
+      (s) => s.provider_customer_id === customerId || s.stripe_customer_id === customerId
     ) || null
   );
 }
@@ -1143,15 +1141,15 @@ export async function getSubscriptionByProviderSubId(subId: string): Promise<Sub
   reloadLocalStore();
   return (
     memoryStore.subscriptions.find(
-      (s) => s.provider_subscription_id === subId || s.paddle_subscription_id === subId
+      (s) => s.provider_subscription_id === subId || s.stripe_subscription_id === subId
     ) || null
   );
 }
 
-export async function getUserByPaddleCustomerId(customerId: string): Promise<User | null> {
+export async function getUserByStripeCustomerId(customerId: string): Promise<User | null> {
   reloadLocalStore();
   const sub = memoryStore.subscriptions.find(
-    (s) => s.paddle_customer_id === customerId || s.provider_customer_id === customerId
+    (s) => s.stripe_customer_id === customerId || s.provider_customer_id === customerId
   );
   if (sub) {
     return memoryStore.users.find((u) => u.id === sub.user_id) || null;
@@ -1223,7 +1221,7 @@ export async function getAdminDashboardStats(): Promise<import('./types.js').Adm
     system_health: {
       database: 'PASS',
       email: process.env.RESEND_API_KEY ? 'PASS' : 'NOT CONFIGURED',
-      paddle: isPaddleConfigured() ? 'PASS' : 'NOT CONFIGURED',
+      stripe: isStripeConfigured() ? 'PASS' : 'NOT CONFIGURED',
       worker: 'PASS',
     },
   };
@@ -1341,8 +1339,8 @@ export async function getAdminSubscriptions(params?: {
       provider: s.provider,
       provider_customer_id: s.provider_customer_id,
       provider_subscription_id: s.provider_subscription_id,
-      paddle_customer_id: s.paddle_customer_id,
-      paddle_subscription_id: s.paddle_subscription_id,
+      stripe_customer_id: s.stripe_customer_id,
+      stripe_subscription_id: s.stripe_subscription_id,
       current_period_start: s.current_period_start,
       current_period_end: s.current_period_end,
       cancel_at_period_end: s.cancel_at_period_end,
@@ -1376,7 +1374,7 @@ export async function getAdminActivityLogs(params?: {
 
 export async function getAdminSystemHealth(workerStatus?: any): Promise<import('./types.js').AdminSystemHealth> {
   const emailConfigured = Boolean(process.env.RESEND_API_KEY);
-  const paddleConfigured = isPaddleConfigured();
+  const stripeConfigured = isStripeConfigured();
 
   return {
     database: {
@@ -1391,12 +1389,12 @@ export async function getAdminSystemHealth(workerStatus?: any): Promise<import('
       provider: 'Resend',
       from_email: process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL || 'Receipto <billing@resend.dev>',
     },
-    paddle: {
-      status: paddleConfigured ? 'PASS' : 'NOT CONFIGURED',
-      configured: paddleConfigured,
-      environment: getPaddleEnvironment(),
-      webhook_configured: isPaddleWebhookConfigured(),
-      price_ids_configured: paddleConfigured,
+    stripe: {
+      status: stripeConfigured ? 'PASS' : 'NOT CONFIGURED',
+      configured: stripeConfigured,
+      webhook_configured: isStripeWebhookConfigured(),
+      price_ids_configured: stripeConfigured,
+      publishable_key_configured: Boolean(getStripePublishableKey()),
     },
     application: {
       status: 'PASS',

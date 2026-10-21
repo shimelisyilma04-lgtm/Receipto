@@ -43,7 +43,7 @@ import {
   recordProcessedWebhookEvent,
   getSubscriptionByCustomerId,
   getSubscriptionByProviderSubId,
-  getUserByPaddleCustomerId,
+  getUserByStripeCustomerId,
   updateUserLastLogin,
   getAdminDashboardStats,
   getAdminUsers,
@@ -60,25 +60,13 @@ import {
   recordVerificationAttempt,
 } from './db.js';
 import {
-  isPaddleConfigured,
-  isPaddleWebhookConfigured,
-  getPaddleEnvironment,
-  getPaddleClientToken,
-  getPaddlePriceId,
-  getCheckoutParams,
-  verifyPaddleWebhookSignature,
-  parsePaddleWebhookEvent,
-  cancelPaddleSubscription,
-  getPaddleSubscription,
-  mapPaddlePriceToPlan,
-  isPaddleIpAllowed,
-} from './paddle.js';
-import {
   isStripeConfigured,
   isStripeWebhookConfigured,
   getStripePublishableKey,
   getStripePriceId,
-  getStripeCheckoutParams,
+  createStripeCheckoutSession,
+  createStripePortalSession,
+  cancelStripeSubscription,
   verifyStripeWebhookSignature,
 } from './stripe.js';
 import {

@@ -13,7 +13,7 @@ export interface User {
   terms_accepted_at?: string;
   terms_version?: string;
   last_login_at?: string;
-  paddle_customer_id?: string | null;
+  stripe_customer_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -124,8 +124,8 @@ export interface DashboardStats {
 export type PlanTier = 'FREE' | 'STARTER' | 'GROWTH';
 export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'cancelled' | 'expired';
 export type BillingInterval = 'monthly' | 'annual';
-export type SubscriptionProvider = 'paddle' | 'manual' | 'demo';
-export type AccessMode = 'paddle' | 'owner_demo' | 'free';
+export type SubscriptionProvider = 'stripe' | 'manual' | 'demo';
+export type AccessMode = 'stripe' | 'owner_demo' | 'free';
 
 export interface Subscription {
   id: string;
@@ -137,8 +137,8 @@ export interface Subscription {
   access_mode?: AccessMode;
   provider_customer_id: string | null;
   provider_subscription_id: string | null;
-  paddle_customer_id?: string | null;
-  paddle_subscription_id?: string | null;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
   current_period_start: string;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
