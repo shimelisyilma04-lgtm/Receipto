@@ -74,6 +74,14 @@ import {
   isPaddleIpAllowed,
 } from './paddle.js';
 import {
+  isStripeConfigured,
+  isStripeWebhookConfigured,
+  getStripePublishableKey,
+  getStripePriceId,
+  getStripeCheckoutParams,
+  verifyStripeWebhookSignature,
+} from './stripe.js';
+import {
   PLAN_CONFIGS,
   type PlanTier,
   type BillingInterval,
@@ -2063,7 +2071,12 @@ router.get('/billing/subscription', requireAuth, async (req: AuthenticatedReques
     res.status(200).json({
       ...details,
       is_owner_demo: isOwner,
+      access_mode: isOwner ? 'owner_demo' : 'standard',
       owner_demo_available_plans: isOwner ? ['FREE', 'STARTER', 'GROWTH'] : undefined,
+      payment_provider: process.env.PAYMENT_PROVIDER || 'paddle',
+      paddle_configured: isPaddleConfigured(),
+      stripe_configured: isStripeConfigured(),
+      stripe_publishable_key: getStripePublishableKey(),
     });
   } catch (err: any) {
     console.error('[Get Subscription Error]', err);
@@ -2084,6 +2097,37 @@ router.post('/billing/checkout', requireAuth, async (req: AuthenticatedRequest, 
 
     const billingInterval: BillingInterval = interval === 'annual' ? 'annual' : 'monthly';
     const sub = await getSubscription(userId);
+
+    const requestedProvider = req.body?.provider || process.env.PAYMENT_PROVIDER || 'paddle';
+    if (requestedProvider === 'stripe') {
+      const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+      const stripeParams = getStripeCheckoutParams({
+        plan,
+        interval: billingInterval,
+        customerEmail: userEmail,
+        customerId: sub.provider_customer_id || undefined,
+        userId,
+        baseUrl,
+      });
+
+      await createActivityLog(
+        userId,
+        'CHECKOUT_INITIATED',
+        `Initiated Stripe checkout for ${plan} (${billingInterval})`
+      );
+
+      return res.status(200).json({
+        success: true,
+        provider: 'stripe',
+        stripe_configured: isStripeConfigured(),
+        publishable_key: stripeParams.publishableKey,
+        price_id: stripeParams.priceId,
+        plan: stripeParams.plan,
+        interval: stripeParams.interval,
+        customer_email: stripeParams.customerEmail,
+        checkout_params: stripeParams,
+      });
+    }
 
     const checkoutParams = getCheckoutParams(
       userId,
@@ -2659,6 +2703,37 @@ const handlePaddleWebhook = async (req: Request, res: Response) => {
 // Mount both standard /api/webhooks/paddle and legacy /api/billing/webhook
 router.post('/webhooks/paddle', handlePaddleWebhook);
 router.post('/billing/webhook', handlePaddleWebhook);
+
+// POST /api/webhooks/stripe (Stripe Webhook Handler)
+router.post('/webhooks/stripe', async (req: Request, res: Response) => {
+  try {
+    const rawBody = (req as any).rawBody || JSON.stringify(req.body);
+    const sigHeader = (req.headers['stripe-signature'] as string) || '';
+
+    if (isStripeWebhookConfigured()) {
+      const isValid = verifyStripeWebhookSignature(rawBody, sigHeader);
+      if (!isValid) {
+        return res.status(400).json({ error: 'Invalid Stripe webhook signature' });
+      }
+    }
+
+    const event = typeof req.body === 'object' ? req.body : JSON.parse(rawBody.toString('utf8'));
+    const eventId = event?.id;
+
+    if (eventId) {
+      const isProcessed = await isWebhookEventProcessed(eventId);
+      if (isProcessed) {
+        return res.status(200).json({ received: true, duplicate: true });
+      }
+      await recordProcessedWebhookEvent(eventId, event.type || 'stripe.event');
+    }
+
+    res.status(200).json({ received: true });
+  } catch (err: any) {
+    console.error('[Stripe Webhook Processing Error]', err);
+    res.status(500).json({ error: 'Internal webhook error' });
+  }
+});
 
 // ==========================================
 // 9. SETTINGS & PROFILE

@@ -6,7 +6,14 @@
  * for production deployment without exposing sensitive secrets.
  */
 
-import { evaluateProductionReadiness } from '../server/readiness.js';
+let evaluateProductionReadiness;
+try {
+  const mod = await import('../server/readiness.js').catch(() => import('../server/readiness.ts'));
+  evaluateProductionReadiness = mod.evaluateProductionReadiness;
+} catch (e) {
+  console.error('To run the readiness check with TypeScript, please run: npm run readiness (or npx tsx scripts/check_readiness.mjs)');
+  process.exit(1);
+}
 
 console.log('\n======================================================');
 console.log('       RECEIPTO PRODUCTION READINESS CHECKER');

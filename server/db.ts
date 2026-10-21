@@ -1421,8 +1421,8 @@ export async function getAdminSystemHealth(workerStatus?: any): Promise<import('
   };
 }
 
-export async function updateOwnerDemoPlan(email: string, plan: PlanTier): Promise<boolean> {
-  const user = await getUserByEmail(email);
+export async function updateOwnerDemoPlan(identifier: string, plan: PlanTier): Promise<boolean> {
+  const user = (await getUserByEmail(identifier)) || (await getUserById(identifier));
   if (!user) return false;
   await upsertSubscription(user.id, { plan, status: 'active', provider: 'manual' });
   return true;

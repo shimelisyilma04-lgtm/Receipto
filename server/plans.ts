@@ -186,10 +186,6 @@ export function getEffectivePlan(
  * Strictly server-side; NEVER expose this email to frontend clients.
  */
 export function getOwnerDemoEmail(): string {
-  const envEmail = process.env.OWNER_DEMO_EMAIL?.trim().toLowerCase();
-  if (envEmail && envEmail.includes('@')) {
-    return envEmail;
-  }
   try {
     const overrideFile = path.join(process.cwd(), 'data', 'owner_override.json');
     if (fs.existsSync(overrideFile)) {
@@ -199,6 +195,10 @@ export function getOwnerDemoEmail(): string {
       }
     }
   } catch {}
+  const envEmail = process.env.OWNER_DEMO_EMAIL?.trim().toLowerCase();
+  if (envEmail && envEmail.includes('@')) {
+    return envEmail;
+  }
   return 'receiptobusiness@gmail.com';
 }
 
@@ -210,7 +210,16 @@ export function isOwnerEmail(email?: string | null): boolean {
   if (!email) return false;
   const clean = email.trim().toLowerCase();
   const ownerEmail = getOwnerDemoEmail();
-  return (ownerEmail ? clean === ownerEmail : false) || clean === 'receiptobusiness@gmail.com' || clean === 'rshimelis48@gmail.com';
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const envEmail = process.env.OWNER_DEMO_EMAIL?.trim().toLowerCase();
+  return (
+    (ownerEmail ? clean === ownerEmail : false) ||
+    (envEmail ? clean === envEmail : false) ||
+    (adminEmail ? clean === adminEmail : false) ||
+    clean === 'receiptobusiness@gmail.com' ||
+    clean === 'rshimelis48@gmail.com' ||
+    clean === 'shimelisyilma04@gmail.com'
+  );
 }
 
 /**
