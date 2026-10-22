@@ -1,20 +1,20 @@
 # Receipto — Modern Invoicing & Payment Follow-up SaaS
 
-Receipto helps businesses track invoices, identify overdue payments, and follow up with customers with zero friction.
+Receipto helps businesses track accounts receivable, identify overdue invoices, and follow up with customers with zero friction.
 
-Built with a **100% Firebase-Powered Architecture** (Cloud Firestore & Firebase Authentication), **Stripe as the Sole Payment Provider** for recurring subscriptions, and **Resend** for transactional email notifications.
+Built with a **100% Firebase-Powered Architecture** (Cloud Firestore & Firebase Authentication), **Stripe as the Sole Payment Provider** for recurring subscriptions, and **Resend** for transactional email delivery.
 
 ---
 
 ## Architecture Overview: Firebase & Cloud Firestore Powered
 
-> **Environment & Deployment Notice:** Receipto is strictly **Firebase-Powered**. All legacy Supabase and PostgreSQL database configurations have been completely eliminated and replaced by Google Cloud Firestore and Firebase Authentication for robust multi-tenant data isolation, security rules, and serverless reliability.
+> **Environment & Deployment Architecture:** Receipto is strictly **Firebase-Powered**. All legacy Supabase and PostgreSQL database configurations have been completely eliminated and replaced by Google Cloud Firestore and Firebase Authentication for robust multi-tenant data isolation, security rules, and serverless reliability.
 
 1. **Authoritative Backend Data Store**: **Cloud Firestore**
    - Cloud Firestore is the single source of truth for all user records, clients, invoices, reminders, activity audit logs, and subscriptions.
-   - User data is strictly isolated within `users/{uid}` document hierarchies and isolated subcollections (`clients`, `invoices`, `reminders`, `activity_logs`, `subscription`).
-   - Hardened Firestore Security Rules (`firestore.rules`) prevent cross-tenant data access, unauthorized role escalations, and unverified subscription modifications.
-   - All legacy Supabase and PostgreSQL database dependencies have been completely replaced by Firebase.
+   - User data is strictly isolated within `users/{uid}` document hierarchies and scoped subcollections (`clients`, `invoices`, `reminders`, `activity_logs`, `subscription`).
+   - Hardened Firestore Security Rules (`firestore.rules`) enforce tenant boundaries, prevent unauthorized role escalations, and prohibit client-side subscription modifications.
+   - Zero external relational databases (PostgreSQL/Supabase) are required.
 
 2. **Authentication & Session Security**: **Firebase Authentication**
    - Secure email & password registration and login with cryptographic password hashing.
@@ -29,7 +29,6 @@ Built with a **100% Firebase-Powered Architecture** (Cloud Firestore & Firebase 
    - Stripe Checkout sessions for Starter and Growth plans (Monthly and Annual billing).
    - Stripe Customer Portal for self-service payment method updates, billing history, and subscription cancellations.
    - Idempotent webhook event processing for `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, and `invoice.payment_failed`.
-   - All legacy Paddle SDKs, scripts, and endpoints have been completely eliminated.
 
 4. **Transactional Email & Reminders**: **Resend**
    - Responsive email templates for invoice reminders (Friendly, Standard, Urgent).
@@ -74,7 +73,9 @@ Built with a **100% Firebase-Powered Architecture** (Cloud Firestore & Firebase 
     ├── test_bugfixes.mjs       # Bugfix and regression suite
     ├── test_stripe_integration.mjs # Stripe provider test suite
     ├── verify_owner_demo.mjs   # Owner demo & plan limits test suite
-    └── test_email_verification_flow.ts # Secure verification tests
+    ├── test_email_verification_flow.ts # Secure verification tests
+    ├── check_readiness.mjs     # Environment readiness CLI diagnostic
+    └── make-admin.mjs          # User role promotion CLI tool
 ```
 
 ---
@@ -120,7 +121,7 @@ To deploy Receipto with your own payment processing, follow these steps:
 
 ### 1. Verify Eligibility & Create Your Stripe Account
 - Visit [https://stripe.com](https://stripe.com) and create or sign in to your Stripe account.
-- *Note:* Stripe operates in 46+ countries. Ensure your legal business entity and operating country satisfy Stripe's current eligibility requirements and supported merchant jurisdictions.
+- *Merchant Eligibility Notice:* Stripe operates in 46+ countries. Ensure your legal business entity and operating jurisdiction satisfy Stripe's current merchant eligibility requirements.
 
 ### 2. Obtain Your API Keys (Start in Test Mode)
 - Toggle the Stripe Dashboard to **Test Mode** (top-right switch).
@@ -167,7 +168,7 @@ In your Stripe Dashboard under **Product catalog**:
 - Start the application locally: `npm run dev`
 - Log in and navigate to **Billing / Plans**.
 - Select the Starter or Growth plan to launch Stripe Checkout.
-- Use Stripe test card numbers (e.g., `4242 4242 4242 4242`, any future expiration date, and any 3-digit CVC).
+- Use Stripe official test card numbers (e.g., `4242 4242 4242 4242`, any future expiration date, and any 3-digit CVC).
 - Verify that your subscription status updates immediately upon completion and that features unlock according to your plan tier.
 
 ---
@@ -199,20 +200,40 @@ npm start
 
 ---
 
-## Deployment: Firebase Powered
+## Deployment Architecture & Supported Options
 
-### Option A: Full-Stack Container (Recommended: Cloud Run, Render, Railway, VPS)
+Receipto is a full-stack web application comprising a Vite React Single Page Application (frontend) and an Express Node.js API (backend).
+
+### Full-Stack Deployment vs. Frontend-Only Static Hosting
+
+It is critical for an acquiring team or prospective operator to understand the architectural distinction between full-stack deployment and frontend static hosting:
+
+| Feature / Responsibility | Full-Stack Node Container (Recommended) | Frontend-Only Static Hosting (CDN / Bucket) |
+| :--- | :--- | :--- |
+| **Hosting Target** | Google Cloud Run, Render, Railway, AWS ECS, VPS, Docker | Firebase Hosting, Vercel Static, AWS S3 / CloudFront |
+| **Command** | `npm run build && npm start` | `firebase deploy --only hosting` |
+| **Stripe Secret Operations** | **Supported** (Server-side API calls with `STRIPE_SECRET_KEY`) | **Not Supported** (Secret keys cannot be exposed on client) |
+| **Stripe Webhooks Ingestion** | **Supported** (`POST /api/webhooks/stripe` signature verification) | **Not Supported** (No server process to receive webhooks) |
+| **Resend Email Delivery** | **Supported** (Server-side API calls with `RESEND_API_KEY`) | **Not Supported** (API key cannot be exposed to browser) |
+| **Session Cookies / Auth** | **Supported** (HttpOnly cookies + Bearer token verification) | **Client-only** (Limited to direct Firebase client tokens) |
+| **Diagnostic Endpoints** | **Supported** (`/health`, `/system/readiness`) | **Not Supported** |
+
+> **Crucial Security Guideline:** Server-side Stripe credentials (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) and Resend credentials (`RESEND_API_KEY`) must **only** reside in a secure, server-side environment. Never expose them to public client bundles.
+
+### Recommended Deployment Options
+
+#### Option A: Full-Stack Container (Recommended: Google Cloud Run, Render, Railway, VPS)
 Build the frontend and server bundle into a standalone executable:
 ```bash
 npm run build
 npm start
 ```
-- Health check endpoint: `GET /health` (returns HTTP 200 with engine `firestore`)
-- Readiness report: `GET /system/readiness`
-- Fully Firebase-powered: Uses Cloud Firestore and Firebase Authentication with zero external SQL or Supabase servers required.
+- Set environment variables in your container management dashboard according to `.env.example`.
+- Health check endpoint: `GET /health` (returns HTTP 200 with engine `firestore`).
+- Readiness report: `GET /system/readiness` (returns configuration validation).
 
-### Option B: Firebase Hosting & Security Rules
-Deploy the pre-built `dist/` directory directly to Firebase Hosting:
+#### Option B: Hybrid (Firebase Hosting with Cloud Run Backend)
+Deploy the pre-built `dist/` directory to Firebase Hosting and route `/api/**` to your Cloud Run service via `firebase.json` rewrites:
 ```bash
 firebase deploy --only hosting
 ```
@@ -220,6 +241,32 @@ Deploy the security rules:
 ```bash
 firebase deploy --only firestore:rules
 ```
+
+---
+
+## Software Licensing, IP Ownership & Acquisition Due Diligence
+
+### 1. Proprietary Source Code Ownership
+- The custom application source code (including frontend React components, backend Express controllers, database handlers, business logic, reminders engine, and custom styling) is proprietary intellectual property created for Receipto.
+- The repository does not currently include a public open-source license file (e.g. MIT, GPL). For an acquisition or asset sale, a formal **Intellectual Property Assignment Agreement** or **Commercial Software License** executed between the seller and the acquiring entity is required.
+
+### 2. Third-Party Open Source Dependencies & Attribution
+Receipto incorporates standard open-source libraries via `npm`. These dependencies are distributed under permissive open-source licenses:
+- **MIT License**: React, React DOM, Vite, Express, Lucide React, Motion, Tsx, Cookie-parser, Dotenv.
+- **Apache-2.0 License**: Google GenAI SDK (`@google/genai`), Firebase JS SDK (`firebase`), Firebase Admin SDK (`firebase-admin`).
+- **BSD-2-Clause / BSD-3-Clause / ISC**: Bcryptjs, TypeScript, Esbuild, Autoprefixer.
+
+*Ownership Transfer Notice:* The acquisition or transfer of this repository conveys rights only to the original proprietary code, assets, and documentation authored specifically for Receipto. It does not convey exclusive copyright to third-party open-source libraries or runtime dependencies, which remain subject to their respective upstream licenses.
+
+### 3. AI Training & Code Research Permissions
+- **Proprietary Code:** The seller/copyright holder can grant or assign rights to use the original proprietary code for AI model training, fine-tuning, code intelligence, and research as part of the asset transfer agreement.
+- **Third-Party Code:** Training on third-party dependencies (`node_modules`) or open-source packages is governed by the respective upstream open-source licenses and applicable intellectual property law.
+- **No Inherent Data Scraping:** The application does not contain scraped proprietary datasets or third-party proprietary trade secrets.
+
+### 4. Decisions Requiring Owner / Seller Action Prior to Sale
+1. **Formal License Selection**: Determine whether the codebase will be transferred under a full copyright assignment (Asset Purchase Agreement), an exclusive commercial license, or dual-licensed.
+2. **Entity & Trademark Assignment**: Formally assign the "Receipto" trademark/wordmark, domain names, and brand assets to the buyer.
+3. **Representations & Warranties**: Review standard M&A warranties regarding non-infringement, absence of undisclosed open-source copyleft licenses (no GPL/AGPL dependencies exist in `package.json`), and authority to sell.
 
 ---
 
@@ -243,8 +290,3 @@ git remote add origin https://github.com/<your-username>/receipto.git
 # 5. Push changes to GitHub main branch when ready
 git push -u origin main
 ```
-
----
-
-## License
-Commercial SaaS codebase ready for buyer deployment, AI training, and code research.
