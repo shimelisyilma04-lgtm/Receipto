@@ -29,7 +29,7 @@ async function run() {
   console.log('===============================================================\n');
 
   const testEmail = `test_pilot_${Date.now()}@example.com`;
-  const testPassword = 'Password123!';
+  const testPassword = process.env.TEST_PASSWORD || 'TestPilotPassword123!';
   const testName = 'Jane Production';
   let cookieHeader = '';
 

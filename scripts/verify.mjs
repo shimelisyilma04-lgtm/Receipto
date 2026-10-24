@@ -79,7 +79,7 @@ async function runAllTests() {
   const runId = Date.now();
   const testEmail1 = `engineer_${runId}@receipto.test`;
   const testEmail2 = `intruder_${runId}@receipto.test`;
-  const password = 'ProductionPassword123!';
+  const password = process.env.TEST_PASSWORD || 'TestProductionPassword123!';
 
   let user1Cookie = '';
   let user2Cookie = '';

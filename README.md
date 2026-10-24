@@ -37,25 +37,71 @@ Built with a **100% Firebase-Powered Architecture** (Cloud Firestore & Firebase 
 
 ---
 
+## Prerequisites & Clean Clone Installation
+
+- **Node.js**: `v22.x` (LTS) or higher recommended (compatible with Node 22+)
+- **Package Manager**: `npm` (v10+). Deterministic installations use `package-lock.json`.
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd receipto
+
+# Install exact dependencies deterministically
+npm ci
+```
+
+---
+
 ## Directory Structure
 
 ```
+├── .github/
+│   └── workflows/
+│       └── ci.yml              # GitHub Actions CI workflow (lint, test, build, audit)
 ├── firebase-applet-config.json # Firebase client configuration
 ├── firebase-blueprint.json     # Intermediate Schema Blueprint
 ├── firebase.json               # Firebase hosting and rules config
 ├── firestore.rules             # Production security rules
-├── server.ts                   # Express server with Vite integration & background workers
-├── server/                     # Backend API & service modules
+├── package-lock.json           # Deterministic npm dependency lockfile
+├── vitest.config.ts            # Vitest unit & integration test configuration
+├── server.ts                   # Express server entry point & background worker
+├── server/                     # Backend modular architecture
 │   ├── auth.ts                 # Authentication & session middlewares
-│   ├── db.ts                   # Database models & Firestore handlers
-│   ├── email.ts                # Resend email provider adapter
-│   ├── plans.ts                # Subscription plan definitions & limits
+│   ├── db.ts                   # Facade re-exporting domain repositories & init
+│   ├── email.ts                # Resend transactional email provider
+│   ├── plans.ts                # Subscription plan definitions & tier limits
 │   ├── readiness.ts            # Production readiness evaluator
-│   ├── routes.ts               # REST API endpoints & Stripe webhooks
-│   ├── stripe.ts               # Stripe billing provider adapter (Checkout & Portal)
+│   ├── routes.ts               # Express router mounting domain controllers
+│   ├── stripe.ts               # Stripe billing provider (Checkout & Portal)
 │   ├── types.ts                # Server TypeScript definitions
-│   ├── verification.ts         # Secure email verification engine
-│   └── worker.ts               # Automated invoice reminder background worker
+│   ├── verification.ts         # Secure email OTP challenge engine
+│   ├── worker.ts               # Automated invoice reminder background worker
+│   ├── lib/                    # Concurrency, state, and structured logging
+│   │   ├── asyncKeyLock.ts     # Per-key write mutex primitive
+│   │   ├── dbStore.ts          # In-memory store & disk persistence
+│   │   └── logger.ts           # Structured Pino logger with credential redaction
+│   ├── repositories/           # Isolated domain repositories
+│   │   ├── userRepository.ts
+│   │   ├── clientRepository.ts
+│   │   ├── invoiceRepository.ts
+│   │   ├── reminderRepository.ts
+│   │   ├── activityRepository.ts
+│   │   ├── subscriptionRepository.ts
+│   │   ├── verificationRepository.ts
+│   │   └── adminRepository.ts
+│   ├── routes/                 # Domain-specific route controllers
+│   │   ├── auth.routes.ts
+│   │   ├── clients.routes.ts
+│   │   ├── invoices.routes.ts
+│   │   ├── reminders.routes.ts
+│   │   ├── activity.routes.ts
+│   │   ├── billing.routes.ts
+│   │   ├── admin.routes.ts
+│   │   ├── helpers.routes.ts
+│   │   └── invoicePrintTemplate.ts
+│   └── tests/                  # Backend automated test suite
+│       └── routes.test.ts      # Real route tests, auth, tenant isolation
 ├── src/                        # Frontend React SPA
 │   ├── App.tsx                 # Main application controller & routing
 │   ├── api.ts                  # Client API & Firebase Auth client
@@ -65,10 +111,12 @@ Built with a **100% Firebase-Powered Architecture** (Cloud Firestore & Firebase 
 │   │   ├── LandingPage.tsx     # Responsive homepage with legal header navigation
 │   │   ├── LegalPages.tsx      # Privacy Policy, Terms, and Refund Policy
 │   │   └── Navbar.tsx          # Authenticated top header with legal menu
-│   └── services/
-│       └── firestoreService.ts # Direct Firestore operations & error handlers
-└── scripts/                    # Automated test suites & verification tools
-    ├── run_all_tests.mjs       # Master test runner (105+ automated tests)
+│   ├── services/
+│   │   └── firestoreService.ts # Direct Firestore operations & error handlers
+│   └── tests/                  # Frontend automated test suite
+│       └── api.test.ts         # API client, error parsing, and retry tests
+└── scripts/                    # End-to-end test suites & verification tools
+    ├── run_all_tests.mjs       # Master regression runner (105+ automated tests)
     ├── verify.mjs              # End-to-end integration test suite
     ├── test_bugfixes.mjs       # Bugfix and regression suite
     ├── test_stripe_integration.mjs # Stripe provider test suite
@@ -176,8 +224,8 @@ In your Stripe Dashboard under **Product catalog**:
 ## Quickstart & Local Development
 
 ```bash
-# 1. Install dependencies
-npm install
+# 1. Install dependencies deterministically
+npm ci
 
 # 2. Run TypeScript compilation check
 npm run lint
@@ -185,16 +233,19 @@ npm run lint
 # 3. Start local development server (serves frontend & backend on port 3000)
 npm run dev
 
-# 4. Run automated test suite (105+ automated tests across 5 suites)
+# 4. Run automated unit & route test suite (Vitest)
 npm test
 
-# 5. Check production environment readiness
+# 5. Run end-to-end integration and regression suite
+npm run test:e2e
+
+# 6. Check production environment readiness diagnostic
 npm run readiness
 
-# 6. Build for production deployment
+# 7. Build for production deployment
 npm run build
 
-# 7. Start production server
+# 8. Start production server
 npm start
 ```
 

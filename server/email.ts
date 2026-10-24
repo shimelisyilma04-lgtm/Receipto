@@ -1,4 +1,5 @@
 // Email service for Invoice reminders using Resend API
+import { logger } from './lib/logger.js';
 
 export interface SendReminderOptions {
   to: string;
@@ -180,7 +181,7 @@ export async function sendReminderEmail(options: SendReminderOptions): Promise<E
 
     if (!response.ok) {
       const errorMsg = data?.message || data?.error || `HTTP ${response.status} from Resend`;
-      console.error('[Resend Error]', errorMsg);
+      logger.error({ errorMsg }, 'Resend email error');
       return {
         success: false,
         configured: true,
@@ -196,7 +197,7 @@ export async function sendReminderEmail(options: SendReminderOptions): Promise<E
       statusText: 'Reminder email sent.',
     };
   } catch (err: any) {
-    console.error('[Email Dispatch Error]', err.message);
+    logger.error({ err: err.message }, 'Email dispatch error');
     return {
       success: false,
       configured: true,
@@ -317,7 +318,7 @@ Receipto Automated Security`;
 
     if (!response.ok) {
       const errorMsg = data?.message || data?.error || `HTTP ${response.status} from Resend`;
-      console.error('[Resend Error sending OTP]', errorMsg);
+      logger.error({ errorMsg }, 'Resend error sending OTP');
       return {
         success: false,
         reason: 'EMAIL_PROVIDER_ERROR',
@@ -332,7 +333,7 @@ Receipto Automated Security`;
       statusText: `Verification code sent. Check your inbox for your 6-digit code.`,
     };
   } catch (err: any) {
-    console.error('[Email Dispatch Error sending OTP]', err.message);
+    logger.error({ err: err.message }, 'Email dispatch error sending OTP');
     return {
       success: false,
       reason: 'EMAIL_PROVIDER_ERROR',

@@ -25,12 +25,13 @@ async function runOwnerDemoTests() {
   console.log('--- RUNNING OWNER DEMO & ATOMIC LIMIT TESTS ---');
 
   // 1. Create a regular (non-owner) user
+  const testPassword = process.env.TEST_PASSWORD || 'TestOwnerPassword123!';
   const regularEmail = `regular_${Date.now()}@receipto.test`;
   const regUserRes = await request('/api/auth/register', {
     method: 'POST',
     body: JSON.stringify({
       email: regularEmail,
-      password: 'Password123!',
+      password: testPassword,
       name: 'Regular User',
       business_name: 'Regular Co',
       terms_accepted: true,
@@ -65,7 +66,7 @@ async function runOwnerDemoTests() {
     method: 'POST',
     body: JSON.stringify({
       email: testOwnerEmail,
-      password: 'Password123!',
+      password: testPassword,
       name: 'Receipto Owner',
       business_name: 'Receipto Corp',
       terms_accepted: true,
@@ -104,7 +105,7 @@ async function runOwnerDemoTests() {
   // Re-login to get refreshed token
   const loginRes = await request('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email: testOwnerEmail, password: 'Password123!' }),
+    body: JSON.stringify({ email: testOwnerEmail, password: testPassword }),
   });
   assert.strictEqual(loginRes.status, 200, 'Owner login successful');
   const verifiedOwnerToken = loginRes.data.token;

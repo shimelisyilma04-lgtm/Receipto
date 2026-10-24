@@ -28,7 +28,7 @@ export interface EmailVerification {
   expires_at: string;
   attempt_count: number;
   used_at: string | null;
-  purpose: 'email_verification' | 'password_reset';
+  purpose: 'email_verification' | 'password_reset' | 'email_change';
   resend_count: number;
   last_resend_at: string;
 }
@@ -36,6 +36,7 @@ export interface EmailVerification {
 export interface Session {
   id: string;
   user_id: string;
+  token?: string;
   expires_at: string;
   created_at: string;
 }

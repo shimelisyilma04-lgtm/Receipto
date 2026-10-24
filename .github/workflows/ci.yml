@@ -1,0 +1,41 @@
+name: Receipto CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Build, Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies (Clean Install)
+        run: npm ci
+
+      - name: Type check (TypeScript)
+        run: npm run lint
+
+      - name: Run automated test suite (Vitest)
+        run: npm test
+
+      - name: Build frontend and server bundles
+        run: npm run build
+
+      - name: Dependency security vulnerability audit
+        run: npm audit --audit-level=high

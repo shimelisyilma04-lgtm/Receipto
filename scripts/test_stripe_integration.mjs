@@ -24,11 +24,12 @@ async function runStripeTests() {
 
   // 1. Register test user
   const email = `stripe_test_${Date.now()}@receipto.test`;
+  const password = process.env.TEST_PASSWORD || 'TestStripePassword123!';
   const regRes = await request('/api/auth/register', {
     method: 'POST',
     body: JSON.stringify({
       email,
-      password: 'Password123!',
+      password,
       name: 'Stripe Tester',
       business_name: 'Stripe Test Corp',
       terms_accepted: true,

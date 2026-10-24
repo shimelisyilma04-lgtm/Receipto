@@ -76,7 +76,7 @@ async function runTests() {
 
   // Register a test user
   const email = `test_audit_${Date.now()}@receipto.test`;
-  const password = 'AuditPassword123!';
+  const password = process.env.TEST_PASSWORD || 'TestAuditPassword123!';
   const regRes = await request('/api/auth/register', {
     method: 'POST',
     body: {
