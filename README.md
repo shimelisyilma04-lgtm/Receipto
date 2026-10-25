@@ -242,12 +242,91 @@ npm run test:e2e
 # 6. Check production environment readiness diagnostic
 npm run readiness
 
-# 7. Build for production deployment
+# 7. Run dependency security vulnerability audit (clean 0 high/critical vulnerabilities)
+npm audit --audit-level=high
+
+# 8. Build for production deployment
 npm run build
 
-# 8. Start production server
+# 9. Start production server
 npm start
 ```
+
+---
+
+## Firebase Configuration & Firestore Deployment Guide
+
+Receipto uses Google Cloud Firestore as its authoritative database and Firebase Authentication for identity.
+
+### 1. Firebase Project Setup & Authentication
+1. Go to the [Firebase Console](https://console.firebase.google.com/) and create or select your project.
+2. In **Build > Authentication**, click **Get Started** and enable the **Google** and **Email/Password** sign-in providers.
+3. Add your deployment domain (e.g., `your-domain.com`) to **Authentication > Settings > Authorized domains**.
+4. In **Project settings > General > Your apps**, register a Web App and download the configuration.
+5. Populate `firebase-applet-config.json` with your credentials:
+   - `apiKey`
+   - `authDomain`
+   - `projectId`
+   - `storageBucket`
+   - `messagingSenderId`
+   - `appId`
+   - `firestoreDatabaseId` (e.g. `(default)` or custom named database)
+
+### 2. Firestore Rules Deployment
+Receipto enforces Zero-Trust multi-tenant rules (`firestore.rules`) isolating each user's records under `/users/{userId}/**` with strict attribute checks.
+
+To deploy security rules using Firebase CLI:
+```bash
+# Log in to Firebase CLI
+firebase login
+
+# Set your target project
+firebase use <your-project-id>
+
+# Deploy security rules
+firebase deploy --only firestore:rules
+```
+
+### 3. Firestore Indexes
+Most queries in Receipto are user-scoped subcollection queries (`/users/{userId}/invoices`) filtered by fields like `issue_date` or `due_date`. Single-field indexes are created automatically by Firestore. For compound queries (e.g., filtering invoices by `payment_status` and sorting by `due_date`), Firestore will automatically generate an index URL in the console log upon first execution. Alternatively, deploy composite indexes via `firestore.indexes.json`:
+```bash
+firebase deploy --only firestore:indexes
+```
+
+---
+
+## Resend Email Configuration & Domain Requirements
+
+Transactional email reminders and account verification codes are dispatched via **Resend**.
+
+1. Create a free account at [https://resend.com](https://resend.com).
+2. Generate an API Key under **API Keys** with "Full access" or "Sending access". Prefix must start with `re_`.
+3. In **Domains**, add and verify your sending domain by publishing the required DNS records (DKIM, SPF, and DMARC TXT records).
+4. Set `RESEND_API_KEY`, `EMAIL_FROM`, and `EMAIL_REPLY_TO` in `.env`:
+   ```bash
+   RESEND_API_KEY=re_1234567890abcdef...
+   EMAIL_FROM=Receipto <billing@your-verified-domain.com>
+   EMAIL_REPLY_TO=support@your-verified-domain.com
+   ```
+5. *Testing without verified domain:* When testing locally before DNS records propagate, Resend permits test sending to the email address associated with your Resend account using `onboarding@resend.dev`.
+
+---
+
+## Known Limitations & External Credentials Checklist
+
+For an acquiring team evaluating the production readiness of Receipto:
+
+1. **Stripe Credentials**:
+   - In development/evaluation mode without active Stripe keys, Receipto runs in **Test Sandbox Simulation**, allowing UI and end-to-end user journeys to be verified safely.
+   - For live production billing, `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, and product recurring price IDs (`STRIPE_STARTER_MONTHLY_PRICE_ID`, etc.) must be provided by the buyer.
+
+2. **Resend Sending Domain**:
+   - Outgoing email delivery requires a verified domain under Resend. If unconfigured, the system gracefully logs reminder dispatches without failing user transactions, and indicates `CONFIG_REQUIRED` in the delivery audit log.
+
+3. **Server-Side Admin Firestore Tasks**:
+   - Client web operations and server health pings authenticate directly via the Firebase Web SDK and Web API key.
+   - For backend administrative operations requiring bypass of user-level security rules, a Google Cloud service account JSON file should be configured via `GOOGLE_APPLICATION_CREDENTIALS` on the server host.
+
 
 ---
 

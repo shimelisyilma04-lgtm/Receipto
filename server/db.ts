@@ -7,9 +7,12 @@ import { getInvoices } from './repositories/invoiceRepository.js';
 import { getActivityLogs } from './repositories/activityRepository.js';
 import { getClients } from './repositories/clientRepository.js';
 
+import { pingFirestore, getFirestoreApp } from './lib/firestoreClient.js';
+
 // Re-export concurrency locking primitive
 export { AsyncKeyLock } from './lib/asyncKeyLock.js';
 export { userMutex, reloadLocalStore, saveStore, memoryStore } from './lib/dbStore.js';
+export { pingFirestore } from './lib/firestoreClient.js';
 
 // Re-export User & Session Repository
 export {
@@ -104,25 +107,52 @@ export {
 } from './repositories/adminRepository.js';
 
 // Initialize database schema (Cloud Firestore Backend)
-export async function initDatabase(): Promise<{ success: boolean; engine: 'firestore'; error?: string }> {
+export async function initDatabase(): Promise<{
+  success: boolean;
+  engine: 'firestore';
+  error?: string;
+  latencyMs?: number;
+}> {
   reloadLocalStore();
-  logger.info('[Receipto] Cloud Firestore authoritative backend initialized successfully.');
-  return { success: true, engine: 'firestore' };
+  const probe = await pingFirestore();
+  if (probe.connected) {
+    logger.info(
+      { databaseId: probe.databaseId, projectId: probe.projectId, latencyMs: probe.latencyMs },
+      '[Receipto] Cloud Firestore authoritative connection established successfully.'
+    );
+    return { success: true, engine: 'firestore', latencyMs: probe.latencyMs };
+  } else {
+    logger.warn(
+      { error: probe.error },
+      '[Receipto] Cloud Firestore connection probe returned offline. Local data cache loaded.'
+    );
+    return { success: false, engine: 'firestore', error: probe.error };
+  }
 }
 
 export function isDatabaseConfigured(): boolean {
-  return fs.existsSync(path.join(process.cwd(), 'firebase-applet-config.json'));
+  return getFirestoreApp() !== null;
 }
 
 export async function checkDatabaseHealth(): Promise<{
   connected: boolean;
   engine: 'firestore';
   details?: string;
+  latencyMs?: number;
 }> {
+  const probe = await pingFirestore();
+  if (probe.connected) {
+    return {
+      connected: true,
+      engine: 'firestore',
+      latencyMs: probe.latencyMs,
+      details: `Cloud Firestore authoritative backend (database: ${probe.databaseId}, project: ${probe.projectId}, latency: ${probe.latencyMs}ms)`,
+    };
+  }
   return {
-    connected: true,
+    connected: false,
     engine: 'firestore',
-    details: 'Cloud Firestore authoritative backend (ai-studio-receptio-29c007e0-504b-47c8-9f48-f964bdf89cf7)',
+    details: `Cloud Firestore unreachable: ${probe.error || 'Network unreachable'}`,
   };
 }
 

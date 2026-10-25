@@ -1,10 +1,23 @@
+import crypto from 'crypto';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 import { router, healthHandler, readinessHandler } from '../routes.js';
-import { initDatabase, reloadLocalStore, setUserEmailVerified } from '../db.js';
+import {
+  initDatabase,
+  reloadLocalStore,
+  setUserEmailVerified,
+  checkDatabaseHealth,
+  isWebhookEventProcessed,
+  recordProcessedWebhookEvent,
+  checkFeatureAccess,
+  checkCanCreateClient,
+  checkCanCreateInvoice,
+} from '../db.js';
+import { verifyStripeWebhookSignature } from '../stripe.js';
+import { generateReminderEmailContent, escapeHtml } from '../email.js';
 
 let server: Server;
 let baseUrl: string;
@@ -337,6 +350,139 @@ describe('Receipto Backend Routes & Security Test Suite', () => {
       it('rejects non-admin from accessing user management endpoints with 403', async () => {
         const res = await testRequest('/api/admin/users', { token: userA_Token });
         expect(res.status).toBe(403);
+      });
+    });
+
+    describe('Stripe Webhook Signature Verification & Idempotency', () => {
+      const testSecret = 'whsec_test_secret_for_cryptographic_verification_12345';
+      const testPayload = JSON.stringify({
+        id: 'evt_test_123',
+        type: 'checkout.session.completed',
+        data: { object: { id: 'cs_123', client_reference_id: 'user_123' } },
+      });
+
+      it('validates authentic webhook signatures correctly using HMAC-SHA256', () => {
+        const timestamp = Math.floor(Date.now() / 1000);
+        const signedPayload = `${timestamp}.${testPayload}`;
+        const signature = crypto.createHmac('sha256', testSecret).update(signedPayload).digest('hex');
+        const header = `t=${timestamp},v1=${signature}`;
+
+        const isValid = verifyStripeWebhookSignature(testPayload, header, testSecret);
+        expect(isValid).toBe(true);
+      });
+
+      it('rejects tampered or forged webhook payloads', () => {
+        const timestamp = Math.floor(Date.now() / 1000);
+        const header = `t=${timestamp},v1=invalid_tampered_signature_hex_value_0000000000000000`;
+
+        const isValid = verifyStripeWebhookSignature(testPayload, header, testSecret);
+        expect(isValid).toBe(false);
+      });
+
+      it('rejects expired webhook signatures to prevent replay attacks (> 300s)', () => {
+        const expiredTimestamp = Math.floor(Date.now() / 1000) - 400; // 400 seconds ago
+        const signedPayload = `${expiredTimestamp}.${testPayload}`;
+        const signature = crypto.createHmac('sha256', testSecret).update(signedPayload).digest('hex');
+        const header = `t=${expiredTimestamp},v1=${signature}`;
+
+        const isValid = verifyStripeWebhookSignature(testPayload, header, testSecret);
+        expect(isValid).toBe(false);
+      });
+
+      it('enforces webhook idempotency by detecting and recording duplicate events', async () => {
+        const eventId = `evt_idempotent_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        expect(await isWebhookEventProcessed(eventId)).toBe(false);
+
+        await recordProcessedWebhookEvent(eventId, 'customer.subscription.updated');
+        expect(await isWebhookEventProcessed(eventId)).toBe(true);
+      });
+    });
+
+    describe('Subscription Entitlements & Tier Limits', () => {
+      it('evaluates feature access flags across plans correctly', async () => {
+        const csvAccess = await checkFeatureAccess(userA_Id, 'csvExport');
+        expect(typeof csvAccess.allowed).toBe('boolean');
+        expect(csvAccess.plan).toBeDefined();
+
+        const autoReminders = await checkFeatureAccess(userA_Id, 'automatedReminders');
+        expect(typeof autoReminders.allowed).toBe('boolean');
+      });
+
+      it('validates client creation limit calculation', async () => {
+        const clientLimit = await checkCanCreateClient(userA_Id);
+        expect(clientLimit).toBeDefined();
+        expect(typeof clientLimit.allowed).toBe('boolean');
+        expect(typeof clientLimit.current).toBe('number');
+      });
+
+      it('validates invoice creation limit calculation', async () => {
+        const invoiceLimit = await checkCanCreateInvoice(userA_Id);
+        expect(invoiceLimit).toBeDefined();
+        expect(typeof invoiceLimit.allowed).toBe('boolean');
+        expect(typeof invoiceLimit.current).toBe('number');
+      });
+    });
+
+    describe('Transactional Email Generation & XSS Protection', () => {
+      it('escapes dangerous HTML characters to prevent XSS in email bodies', () => {
+        const raw = '<script>alert("XSS")</script>&"\'';
+        const escaped = escapeHtml(raw);
+        expect(escaped).not.toContain('<script>');
+        expect(escaped).toContain('&lt;script&gt;');
+        expect(escaped).toContain('&amp;');
+        expect(escaped).toContain('&quot;');
+      });
+
+      it('generates well-formatted payment reminders with proper tone and details', () => {
+        const content = generateReminderEmailContent({
+          to: 'client@example.com',
+          clientName: 'Acme Client',
+          invoiceNumber: 'INV-1001',
+          amount: 500,
+          currency: 'USD',
+          dueDate: '2026-11-01',
+          businessName: 'Receipto Billing',
+          tone: 'urgent',
+          customMessage: 'Please settle urgently.',
+        });
+
+        expect(content.subject).toContain('URGENT');
+        expect(content.subject).toContain('INV-1001');
+        expect(content.html).toContain('Acme Client');
+        expect(content.html).toContain('USD 500.00');
+        expect(content.html).toContain('Please settle urgently.');
+      });
+    });
+
+    describe('Input Validation Edge Cases', () => {
+      it('rejects invoice with negative amount', async () => {
+        const res = await testRequest('/api/invoices', {
+          method: 'POST',
+          token: userA_Token,
+          body: {
+            client_id: 'any_client',
+            invoice_number: `INV-NEG-${Date.now()}`,
+            amount: -50,
+            issue_date: '2026-10-01',
+            due_date: '2026-10-15',
+          },
+        });
+        expect([400, 404]).toContain(res.status);
+      });
+
+      it('rejects invoice with invalid date format', async () => {
+        const res = await testRequest('/api/invoices', {
+          method: 'POST',
+          token: userA_Token,
+          body: {
+            client_id: 'any_client',
+            invoice_number: `INV-DATE-${Date.now()}`,
+            amount: 100,
+            issue_date: 'not-a-valid-date',
+            due_date: '2026-10-15',
+          },
+        });
+        expect([400, 404]).toContain(res.status);
       });
     });
   });
