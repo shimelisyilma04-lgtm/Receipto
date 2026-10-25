@@ -105,7 +105,8 @@ describe('Receipto Backend Routes & Security Test Suite', () => {
   });
 
   describe('Authentication & Authorization', () => {
-    const testPassword = process.env.TEST_PASSWORD || 'SecurePassword123!';
+    // Isolated dynamic fixture per test execution to prevent static hardcoded credentials
+    const testPassword = process.env.TEST_PASSWORD || ('Rcpt$' + crypto.randomBytes(12).toString('hex') + 'A9!');
     const userA_Email = `user_a_${Date.now()}@example.com`;
     const userB_Email = `user_b_${Date.now()}@example.com`;
     let userA_Token: string;

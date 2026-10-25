@@ -80,6 +80,7 @@ npm ci
 │   ├── lib/                    # Concurrency, state, and structured logging
 │   │   ├── asyncKeyLock.ts     # Per-key write mutex primitive
 │   │   ├── dbStore.ts          # In-memory store & disk persistence
+│   │   ├── firestoreClient.ts  # Live Cloud Firestore client & probe
 │   │   └── logger.ts           # Structured Pino logger with credential redaction
 │   ├── repositories/           # Isolated domain repositories
 │   │   ├── userRepository.ts
