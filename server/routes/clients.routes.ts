@@ -13,6 +13,8 @@ import { requireAuth, type AuthenticatedRequest } from '../auth.js';
 import { PlanLimitExceededError } from '../plans.js';
 import { isValidEmail } from './helpers.js';
 import { logger } from '../lib/logger.js';
+import { validateBody } from '../schemas/validate.js';
+import { createClientSchema, updateClientSchema } from '../schemas/client.schema.js';
 
 export const clientsRouter = express.Router();
 
@@ -29,7 +31,7 @@ clientsRouter.get('/clients', requireAuth, async (req: AuthenticatedRequest, res
 });
 
 // POST /api/clients
-clientsRouter.post('/clients', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+clientsRouter.post('/clients', requireAuth, validateBody(createClientSchema), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { name, email, phone, company, address } = req.body;
@@ -105,7 +107,7 @@ clientsRouter.get('/clients/:id', requireAuth, async (req: AuthenticatedRequest,
 });
 
 // PUT /api/clients/:id
-clientsRouter.put('/clients/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+clientsRouter.put('/clients/:id', requireAuth, validateBody(updateClientSchema), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { name, email, phone, company, address } = req.body;

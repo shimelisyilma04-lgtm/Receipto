@@ -57,14 +57,18 @@ npm ci
 
 ```
 ├── .github/
+│   ├── dependabot.yml          # Automated weekly dependency updates
 │   └── workflows/
-│       └── ci.yml              # GitHub Actions CI workflow (lint, test, build, audit)
+│       └── ci.yml              # Hardened GitHub Actions CI (typecheck, lint, test, coverage, build, audit)
+├── Dockerfile                  # Multi-stage secure non-root Docker build
+├── docker-compose.yml          # Production & local Docker Compose stack
+├── eslint.config.js            # ESLint flat config with TypeScript & React Hooks rules
 ├── firebase-applet-config.json # Firebase client configuration
 ├── firebase-blueprint.json     # Intermediate Schema Blueprint
 ├── firebase.json               # Firebase hosting and rules config
 ├── firestore.rules             # Production security rules
 ├── package-lock.json           # Deterministic npm dependency lockfile
-├── vitest.config.ts            # Vitest unit & integration test configuration
+├── vitest.config.ts            # Vitest unit, integration & v8 coverage configuration
 ├── server.ts                   # Express server entry point & background worker
 ├── server/                     # Backend modular architecture
 │   ├── auth.ts                 # Authentication & session middlewares
@@ -80,8 +84,15 @@ npm ci
 │   ├── lib/                    # Concurrency, state, and structured logging
 │   │   ├── asyncKeyLock.ts     # Per-key write mutex primitive
 │   │   ├── dbStore.ts          # In-memory store & disk persistence
-│   │   ├── firestoreClient.ts  # Live Cloud Firestore client & probe
+│   │   ├── firestoreClient.ts  # Live Cloud Firestore client & active latency probe
 │   │   └── logger.ts           # Structured Pino logger with credential redaction
+│   ├── schemas/                # Strict Zod input validation schemas
+│   │   ├── admin.schema.ts     # User role & status schemas
+│   │   ├── auth.schema.ts      # Registration, login, and password schemas
+│   │   ├── billing.schema.ts   # Stripe checkout session schemas
+│   │   ├── client.schema.ts    # Client CRUD validation schemas
+│   │   ├── invoice.schema.ts   # Invoice lifecycle validation schemas
+│   │   └── validate.ts         # Express Zod validation middleware
 │   ├── repositories/           # Isolated domain repositories
 │   │   ├── userRepository.ts
 │   │   ├── clientRepository.ts
@@ -102,12 +113,20 @@ npm ci
 │   │   ├── helpers.routes.ts
 │   │   └── invoicePrintTemplate.ts
 │   └── tests/                  # Backend automated test suite
-│       └── routes.test.ts      # Real route tests, auth, tenant isolation
+│       ├── routes.test.ts      # Real route tests, auth, tenant isolation
+│       └── repositories.test.ts# Isolated unit tests for domain repositories
 ├── src/                        # Frontend React SPA
 │   ├── App.tsx                 # Main application controller & routing
 │   ├── api.ts                  # Client API & Firebase Auth client
 │   ├── firebase.ts             # Firebase SDK client initialization
 │   ├── components/             # UI views, modals, and legal pages
+│   │   ├── AdminPanel.tsx      # Orchestrator administration view
+│   │   ├── admin/              # Modular admin subcomponents
+│   │   │   ├── AdminOverview.tsx
+│   │   │   ├── AdminUsers.tsx
+│   │   │   ├── AdminSubscriptions.tsx
+│   │   │   ├── AdminActivity.tsx
+│   │   │   └── AdminSystem.tsx
 │   │   ├── BillingView.tsx     # Stripe subscription & billing management
 │   │   ├── LandingPage.tsx     # Responsive homepage with legal header navigation
 │   │   ├── LegalPages.tsx      # Privacy Policy, Terms, and Refund Policy
@@ -353,7 +372,7 @@ It is critical for an acquiring team or prospective operator to understand the a
 
 ### Recommended Deployment Options
 
-#### Option A: Full-Stack Container (Recommended: Google Cloud Run, Render, Railway, VPS)
+#### Option A: Full-Stack Container (Recommended: Google Cloud Run, Render, Railway, VPS, Docker)
 Build the frontend and server bundle into a standalone executable:
 ```bash
 npm run build
@@ -363,7 +382,40 @@ npm start
 - Health check endpoint: `GET /health` (returns HTTP 200 with engine `firestore`).
 - Readiness report: `GET /system/readiness` (returns configuration validation).
 
-#### Option B: Hybrid (Firebase Hosting with Cloud Run Backend)
+#### Option B: Docker & Docker Compose
+Run Receipto containerized in isolated production mode with zero local setup:
+```bash
+# Build and run the multi-stage non-root container
+docker-compose up --build -d
+
+# Check live container health status
+docker ps
+curl http://localhost:3000/health
+```
+
+#### Option C: Verification & Quality Assurance Commands
+Run local quality and security checks identical to GitHub Actions CI:
+```bash
+# 1. TypeScript static analysis
+npm run typecheck
+
+# 2. ESLint code cleanliness & React Hook rules
+npm run lint
+
+# 3. Vitest automated test suite (85 tests)
+npm test
+
+# 4. Comprehensive v8 test coverage report
+npm run coverage
+
+# 5. Production build bundle validation
+npm run build
+
+# 6. Dependency vulnerability security audit
+npm audit --audit-level=high
+```
+
+#### Option D: Hybrid (Firebase Hosting with Cloud Run Backend)
 Deploy the pre-built `dist/` directory to Firebase Hosting and route `/api/**` to your Cloud Run service via `firebase.json` rewrites:
 ```bash
 firebase deploy --only hosting

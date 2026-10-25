@@ -18,6 +18,8 @@ import { requireAuth, type AuthenticatedRequest } from '../auth.js';
 import { PlanLimitExceededError } from '../plans.js';
 import { isValidDate } from './helpers.js';
 import { logger } from '../lib/logger.js';
+import { validateBody } from '../schemas/validate.js';
+import { createInvoiceSchema, updateInvoiceSchema, markInvoicePaidSchema } from '../schemas/invoice.schema.js';
 import {
   renderInvoiceNotFoundHtml,
   renderInvoiceErrorHtml,
@@ -111,7 +113,7 @@ invoicesRouter.get(['/invoices/export/csv', '/invoices/export.csv'], requireAuth
 });
 
 // POST /api/invoices
-invoicesRouter.post('/invoices', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+invoicesRouter.post('/invoices', requireAuth, validateBody(createInvoiceSchema), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { client_id, invoice_number, amount, currency, issue_date, due_date, notes } = req.body;
@@ -265,7 +267,7 @@ invoicesRouter.get('/invoices/:id/print', requireAuth, async (req: Authenticated
 });
 
 // PUT /api/invoices/:id
-invoicesRouter.put('/invoices/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+invoicesRouter.put('/invoices/:id', requireAuth, validateBody(updateInvoiceSchema), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { client_id, invoice_number, amount, currency, issue_date, due_date, notes } = req.body;
@@ -334,7 +336,7 @@ invoicesRouter.put('/invoices/:id', requireAuth, async (req: AuthenticatedReques
 });
 
 // POST /api/invoices/:id/pay
-invoicesRouter.post('/invoices/:id/pay', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+invoicesRouter.post('/invoices/:id/pay', requireAuth, validateBody(markInvoicePaidSchema), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { paid_date } = req.body;

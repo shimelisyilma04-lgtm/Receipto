@@ -46,11 +46,20 @@ import {
 } from '../email.js';
 import { isValidEmail } from './helpers.js';
 import { logger } from '../lib/logger.js';
+import { validateBody } from '../schemas/validate.js';
+import {
+  registerSchema,
+  loginSchema,
+  requestPasswordResetSchema,
+  resetPasswordSchema,
+  verifyOtpSchema,
+  changePasswordSchema,
+} from '../schemas/auth.schema.js';
 
 export const authRouter = express.Router();
 
 // POST /api/auth/register
-authRouter.post('/auth/register', authRateLimiter, async (req: Request, res: Response) => {
+authRouter.post('/auth/register', authRateLimiter, validateBody(registerSchema), async (req: Request, res: Response) => {
   try {
     const { email, password, confirm_password, name, business_name, terms_accepted } = req.body;
 
@@ -126,13 +135,9 @@ authRouter.post('/auth/register', authRateLimiter, async (req: Request, res: Res
 });
 
 // POST /api/auth/login
-authRouter.post('/auth/login', authRateLimiter, async (req: Request, res: Response) => {
+authRouter.post('/auth/login', authRateLimiter, validateBody(loginSchema), async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required.' });
-    }
 
     const cleanEmail = email.trim().toLowerCase();
     const user = await getUserByEmail(cleanEmail);

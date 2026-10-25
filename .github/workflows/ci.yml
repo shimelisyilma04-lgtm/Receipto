@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Build, Lint & Test
+    name: Typecheck, Lint, Test & Build
     runs-on: ubuntu-latest
 
     steps:
@@ -28,11 +28,17 @@ jobs:
       - name: Install dependencies (Clean Install)
         run: npm ci
 
-      - name: Type check (TypeScript)
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: ESLint static analysis
         run: npm run lint
 
       - name: Run automated test suite (Vitest)
         run: npm test
+
+      - name: Generate test coverage report
+        run: npm run coverage
 
       - name: Build frontend and server bundles
         run: npm run build

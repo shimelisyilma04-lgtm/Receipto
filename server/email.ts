@@ -213,10 +213,13 @@ export interface SendVerificationEmailOptions {
   otp: string;
 }
 
-export type VerificationEmailDeliveryResult =
-  | { success: true; messageId?: string; statusText: string }
-  | { success: false; reason: 'EMAIL_PROVIDER_NOT_CONFIGURED'; statusText: string }
-  | { success: false; reason: 'EMAIL_PROVIDER_ERROR'; statusText: string; error?: string };
+export type VerificationEmailDeliveryResult = {
+  success: boolean;
+  messageId?: string;
+  statusText: string;
+  reason?: 'EMAIL_PROVIDER_NOT_CONFIGURED' | 'EMAIL_PROVIDER_ERROR' | string;
+  error?: string;
+};
 
 export async function sendVerificationEmail(options: SendVerificationEmailOptions): Promise<VerificationEmailDeliveryResult> {
   const apiKey = process.env.RESEND_API_KEY?.trim();

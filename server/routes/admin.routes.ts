@@ -17,6 +17,8 @@ import {
 } from '../auth.js';
 import { getWorkerStatus, runWorkerCycle } from '../worker.js';
 import { logger } from '../lib/logger.js';
+import { validateBody } from '../schemas/validate.js';
+import { updateUserRoleSchema } from '../schemas/admin.schema.js';
 
 export const adminRouter = express.Router();
 
@@ -83,14 +85,11 @@ adminRouter.post('/admin/users/:id/restore', requireAuth, requireAdmin, async (r
 });
 
 // POST /api/admin/users/:id/role
-adminRouter.post('/admin/users/:id/role', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+adminRouter.post('/admin/users/:id/role', requireAuth, requireAdmin, validateBody(updateUserRoleSchema), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const adminId = req.user!.id;
     const targetId = req.params.id;
     const { role } = req.body;
-    if (role !== 'USER' && role !== 'ADMIN') {
-      return res.status(400).json({ error: 'Invalid role. Must be USER or ADMIN.' });
-    }
     const result = await updateUserRole(adminId, targetId, role);
     if (!result.success) {
       return res.status(400).json({ error: result.error });

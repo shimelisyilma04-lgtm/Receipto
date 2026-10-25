@@ -38,6 +38,8 @@ import {
   sendSubscriptionCancelledEmail,
 } from '../email.js';
 import { logger } from '../lib/logger.js';
+import { validateBody } from '../schemas/validate.js';
+import { checkoutSessionSchema } from '../schemas/billing.schema.js';
 
 export const billingRouter = express.Router();
 
@@ -63,15 +65,11 @@ billingRouter.get('/billing/subscription', requireAuth, async (req: Authenticate
 });
 
 // POST /api/billing/checkout
-billingRouter.post('/billing/checkout', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+billingRouter.post('/billing/checkout', requireAuth, validateBody(checkoutSessionSchema), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const userEmail = req.user!.email;
     const { plan, interval } = req.body as { plan: 'STARTER' | 'GROWTH'; interval: BillingInterval };
-
-    if (!plan || (plan !== 'STARTER' && plan !== 'GROWTH')) {
-      return res.status(400).json({ error: 'Valid plan (STARTER or GROWTH) is required.' });
-    }
 
     const billingInterval: BillingInterval = interval === 'annual' ? 'annual' : 'monthly';
     const sub = await getSubscription(userId);

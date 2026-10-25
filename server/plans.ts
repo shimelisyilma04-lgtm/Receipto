@@ -145,13 +145,14 @@ export const PLAN_CONFIGS: Record<PlanTier, PlanConfig> = {
  * but current_period_end is in the future (cancel at period end).
  */
 export function isPaidSubscriptionActive(
-  status: SubscriptionStatus,
+  status: SubscriptionStatus | string | null | undefined,
   currentPeriodEnd: string | null | undefined
 ): boolean {
-  if (status === 'active' || status === 'trialing') {
+  const s = (status || '').toString().toLowerCase();
+  if (s === 'active' || s === 'trialing') {
     return true;
   }
-  if (status === 'cancelled' && currentPeriodEnd) {
+  if (s === 'cancelled' && currentPeriodEnd) {
     const end = new Date(currentPeriodEnd).getTime();
     return end > Date.now();
   }

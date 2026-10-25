@@ -119,9 +119,13 @@ export async function issueAndSendVerification(user: User): Promise<IssueVerific
   };
 }
 
-export type VerifyResult =
-  | { success: true; user: User }
-  | { success: false; reason: 'not_found' | 'already_verified' | 'expired' | 'max_attempts_exceeded' | 'invalid_code' | 'already_used'; message: string; attemptsRemaining?: number };
+export type VerifyResult = {
+  success: boolean;
+  user?: User;
+  reason?: 'not_found' | 'already_verified' | 'expired' | 'max_attempts_exceeded' | 'invalid_code' | 'already_used';
+  message?: string;
+  attemptsRemaining?: number;
+};
 
 /**
  * Verify a submitted 6-digit OTP for a user
