@@ -18,7 +18,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@google/genai": "^2.4.0",
+    "@google/genai": "^2.31.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/bcryptjs": "^3.0.0",
     "@types/cookie-parser": "^1.4.10",
