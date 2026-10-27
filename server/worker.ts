@@ -1,6 +1,5 @@
 import * as db from './db.js';
 import { sendReminderEmail } from './email.js';
-import { PLAN_CONFIGS } from './plans.js';
 
 interface WorkerState {
   running: boolean;

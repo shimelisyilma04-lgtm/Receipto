@@ -2,13 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   BellRing,
   Send,
-  AlertTriangle,
   CheckCircle,
   Clock,
   Mail,
   RefreshCw,
-  Info,
-  Sparkles,
   Zap,
   Lock,
 } from 'lucide-react';

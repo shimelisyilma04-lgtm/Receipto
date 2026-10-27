@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, ShieldCheck, FileText } from 'lucide-react';
+import { X } from 'lucide-react';
 import { ReceiptoLogo } from './ReceiptoLogo.js';
 
 interface TermsModalProps {

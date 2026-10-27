@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, X, Check, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Sparkles, X, Check, ArrowRight } from 'lucide-react';
 import type { PlanTier } from '../plans.js';
 
 interface UpgradePromptModalProps {
@@ -17,8 +17,8 @@ export function UpgradePromptModal({
   onClose,
   title,
   message,
-  featureOrLimit,
-  currentPlan = 'FREE',
+  featureOrLimit: _featureOrLimit,
+  currentPlan: _currentPlan = 'FREE',
   onNavigateToBilling,
 }: UpgradePromptModalProps) {
   if (!isOpen) return null;

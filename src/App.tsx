@@ -514,7 +514,7 @@ export default function App() {
               setIsClientModalOpen(true);
             }}
             onDeleteClient={handleDeleteClient}
-            onSelectClientForInvoice={(clientId) => {
+            onSelectClientForInvoice={(_clientId) => {
               setEditingInvoice(null);
               setIsInvoiceModalOpen(true);
             }}

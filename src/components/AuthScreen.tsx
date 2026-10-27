@@ -8,7 +8,6 @@ import {
   ArrowRight,
   ShieldCheck,
   ArrowLeft,
-  KeyRound,
 } from 'lucide-react';
 import { api } from '../api.js';
 import type { User } from '../types.js';

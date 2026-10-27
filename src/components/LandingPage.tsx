@@ -1,27 +1,17 @@
 import React, { useState } from 'react';
 import {
-  Receipt,
   ArrowRight,
-  ShieldCheck,
   CheckCircle2,
   Clock,
   Send,
-  AlertTriangle,
-  DollarSign,
   TrendingUp,
   FileText,
-  Users,
-  BellRing,
   Download,
   Check,
-  Sparkles,
   ChevronDown,
-  HelpCircle,
-  Zap,
   Lock,
   Menu,
   X,
-  Shield,
   LifeBuoy,
 } from 'lucide-react';
 import { PLAN_CONFIGS, PlanTier, BillingInterval } from '../plans.js';

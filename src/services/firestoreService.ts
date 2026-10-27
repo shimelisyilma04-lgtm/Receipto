@@ -8,9 +8,6 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
-  query,
-  where,
-  orderBy,
   handleFirestoreError,
   OperationType,
 } from '../firebase.js';
@@ -24,7 +21,7 @@ import type {
   SubscriptionDetails,
   PaymentStatus,
 } from '../types.js';
-import { PLAN_CONFIGS, getEffectivePlan } from '../plans.js';
+import { getEffectivePlan } from '../plans.js';
 
 // Calculate invoice payment status based on due date
 export function computeInvoiceStatus(invoice: Partial<Invoice>, todayStr?: string): PaymentStatus {
@@ -510,7 +507,6 @@ export async function createFirestoreReminder(uid: string, reminder: Omit<Remind
 // ============================================================================
 export async function logFirestoreActivity(uid: string, action: string, details: string, metadata?: any): Promise<void> {
   const logId = crypto.randomUUID();
-  const path = `users/${uid}/activity_logs/${logId}`;
   const logEntry: any = {
     id: logId,
     user_id: uid,
@@ -580,7 +576,7 @@ export async function getFirestoreSubscription(uid: string): Promise<Subscriptio
             user_id: uid,
             plan: 'FREE',
             status: 'active',
-            billing_interval: 'monthly',
+            billing_interval: interval,
             provider: 'manual',
             provider_customer_id: null,
             provider_subscription_id: null,

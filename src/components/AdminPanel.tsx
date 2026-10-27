@@ -158,6 +158,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
     else if (activeSubTab === 'subscriptions') fetchSubscriptions();
     else if (activeSubTab === 'activity') fetchActivity();
     else if (activeSubTab === 'system') fetchSystem();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSubTab, usersPage, subsPage, actPage, roleFilter, statusFilter, planFilter]);
 
   const handleSuspendUser = async (userId: string, userName: string) => {

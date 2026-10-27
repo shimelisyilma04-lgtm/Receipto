@@ -2,21 +2,16 @@ import React, { useState, useEffect } from 'react';
 import {
   CreditCard,
   CheckCircle2,
-  AlertCircle,
   Sparkles,
-  Zap,
   ArrowRight,
-  ShieldCheck,
   RefreshCw,
   ExternalLink,
   Users,
   FileText,
   Clock,
-  Download,
   Check,
   X,
   AlertTriangle,
-  Lock,
   LayoutDashboard,
 } from 'lucide-react';
 import type { SubscriptionDetails, SubscriptionUsage } from '../types.js';
@@ -67,6 +62,7 @@ export function BillingView({
       onShowToast('Stripe checkout was cancelled. You can upgrade anytime.', 'info');
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function verifyStripeSession(sessionId: string, plan: PlanTier, interval: BillingInterval) {

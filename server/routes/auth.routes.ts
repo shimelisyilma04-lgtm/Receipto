@@ -50,10 +50,6 @@ import { validateBody } from '../schemas/validate.js';
 import {
   registerSchema,
   loginSchema,
-  requestPasswordResetSchema,
-  resetPasswordSchema,
-  verifyOtpSchema,
-  changePasswordSchema,
 } from '../schemas/auth.schema.js';
 
 export const authRouter = express.Router();
@@ -381,7 +377,7 @@ authRouter.post('/auth/logout', async (req: AuthenticatedRequest, res: Response)
     }
     clearAuthCookie(res);
     res.status(200).json({ message: 'Logged out successfully' });
-  } catch (err: any) {
+  } catch {
     clearAuthCookie(res);
     res.status(200).json({ message: 'Logged out' });
   }

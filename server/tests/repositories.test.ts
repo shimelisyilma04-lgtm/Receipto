@@ -215,6 +215,15 @@ describe('Authoritative Repository Layer Tests', () => {
       const updated = await updateClient(user2Id, client1Id, { name: 'Unauthorized Mod' });
       expect(updated).toBeNull();
     });
+
+    it('deletes client and prevents further access', async () => {
+      const tempClient = await createClient(user1Id, { name: 'Temp Client', email: 'temp@example.com' });
+      expect(tempClient).toBeDefined();
+      const deleted = await deleteClient(user1Id, tempClient.id);
+      expect(deleted).toBe(true);
+      const lookup = await getClientById(user1Id, tempClient.id);
+      expect(lookup).toBeNull();
+    });
   });
 
   describe('Invoice Repository & Lifecycle', () => {
@@ -281,6 +290,20 @@ describe('Authoritative Repository Layer Tests', () => {
 
       const unpaidInvoices = await getInvoices(user1Id, { status: 'UNPAID' });
       expect(unpaidInvoices.some((i) => i.id === invoice1Id)).toBe(false);
+    });
+
+    it('cancels invoice and marks status CANCELLED', async () => {
+      const invToCancel = await createInvoice(user1Id, {
+        client_id: client1Id,
+        invoice_number: `INV-CANCEL-${Date.now()}`,
+        amount: 80.0,
+        currency: 'USD',
+        issue_date: '2026-10-01',
+        due_date: '2026-11-10',
+      });
+      const cancelled = await cancelInvoice(user1Id, invToCancel.id);
+      expect(cancelled).toBeDefined();
+      expect(cancelled?.payment_status).toBe('CANCELLED');
     });
 
     it('deletes invoice successfully', async () => {

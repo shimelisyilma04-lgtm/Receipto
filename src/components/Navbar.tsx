@@ -14,7 +14,6 @@ import {
   LifeBuoy,
   ChevronRight,
   ShieldCheck,
-  Building2,
 } from 'lucide-react';
 import type { TabType, User } from '../types.js';
 import type { PlanTier } from '../plans.js';

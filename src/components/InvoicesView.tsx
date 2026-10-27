@@ -2,10 +2,7 @@ import React, { useState } from 'react';
 import {
   Plus,
   Search,
-  Filter,
   Download,
-  CheckCircle,
-  AlertTriangle,
   AlertCircle,
   Send,
   Printer,
@@ -41,7 +38,7 @@ interface InvoicesViewProps {
 
 export function InvoicesView({
   invoices,
-  clients,
+  clients: _clients,
   loading,
   error,
   onRefresh,

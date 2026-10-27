@@ -196,7 +196,7 @@ export const handleConfirmBilling = async (req: AuthenticatedRequest, res: Respo
         : now.getTime() + 30 * 24 * 60 * 60 * 1000
     ).toISOString();
 
-    const updated = await upsertSubscription({
+    await upsertSubscription({
       user_id: userId,
       plan: targetPlan,
       status: 'active',

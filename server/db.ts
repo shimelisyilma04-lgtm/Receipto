@@ -1,8 +1,6 @@
-import fs from 'fs';
-import path from 'path';
 import type { DashboardStats } from './types.js';
 import { logger } from './lib/logger.js';
-import { reloadLocalStore, userMutex, saveStore, memoryStore } from './lib/dbStore.js';
+import { reloadLocalStore } from './lib/dbStore.js';
 import { getInvoices } from './repositories/invoiceRepository.js';
 import { getActivityLogs } from './repositories/activityRepository.js';
 import { getClients } from './repositories/clientRepository.js';

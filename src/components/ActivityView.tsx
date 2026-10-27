@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { History, Search, Clock, RefreshCw, CheckCircle2, Shield, Sparkles } from 'lucide-react';
+import { Search, Clock, RefreshCw, Shield, Sparkles } from 'lucide-react';
 import type { ActivityLog } from '../types.js';
 import { api } from '../api.js';
 

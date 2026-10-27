@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Mail, Copy, Check, LifeBuoy, Sparkles, MessageSquare, Clock } from 'lucide-react';
+import { X, Mail, Copy, Check, MessageSquare, Clock } from 'lucide-react';
 import { ReceiptoLogo } from './ReceiptoLogo.js';
 
 interface ContactSupportModalProps {

@@ -202,11 +202,16 @@ export async function getAdminSubscriptions(params?: {
     };
   });
 
+  const page = Math.max(1, params?.page || 1);
+  const limit = Math.max(1, Math.min(100, params?.limit || 50));
+  const total = subs.length;
+  const paginated = subs.slice((page - 1) * limit, page * limit);
+
   return {
-    subscriptions: subs,
-    total: subs.length,
-    page: 1,
-    totalPages: 1,
+    subscriptions: paginated,
+    total,
+    page,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
   };
 }
 
@@ -217,12 +222,25 @@ export async function getAdminActivityLogs(params?: {
   limit?: number;
 }): Promise<{ logs: any[]; total: number; page: number; totalPages: number }> {
   reloadLocalStore();
-  const logs = [...memoryStore.activity_logs].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  let logs = [...memoryStore.activity_logs];
+  if (params?.userId) {
+    logs = logs.filter((l) => l.user_id === params.userId);
+  }
+  if (params?.action) {
+    logs = logs.filter((l) => l.action === params.action);
+  }
+  logs.sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+  const page = Math.max(1, params?.page || 1);
+  const limit = Math.max(1, Math.min(100, params?.limit || 50));
+  const total = logs.length;
+  const paginated = logs.slice((page - 1) * limit, page * limit);
+
   return {
-    logs,
-    total: logs.length,
-    page: 1,
-    totalPages: 1,
+    logs: paginated,
+    total,
+    page,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
   };
 }
 

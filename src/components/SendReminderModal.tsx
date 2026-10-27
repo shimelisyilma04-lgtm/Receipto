@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, Mail, Copy, Check, AlertCircle, Info, Sparkles } from 'lucide-react';
+import { X, Send, Mail, Copy, Check, Info, Sparkles } from 'lucide-react';
 import type { Invoice } from '../types.js';
 import { api } from '../api.js';
 
@@ -24,6 +24,7 @@ export function SendReminderModal({ invoice, onClose, onSuccess, onError }: Send
   useEffect(() => {
     if (!invoice) return;
     loadPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoice?.id, tone, customMessage]);
 
   async function loadPreview() {

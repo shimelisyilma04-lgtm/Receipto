@@ -93,6 +93,9 @@ describe('Receipto Backend Routes & Security Test Suite', () => {
       expect(res.data).toBeDefined();
       expect(res.data.status).toBe('ok');
       expect(res.data.database).toBeDefined();
+
+      const dbHealth = await checkDatabaseHealth();
+      expect(dbHealth).toBeDefined();
     });
 
     it('GET /system/readiness returns detailed system readiness checks', async () => {
@@ -215,6 +218,12 @@ describe('Receipto Backend Routes & Security Test Suite', () => {
       expect(res.data.user.email).toBe(userA_Email.toLowerCase());
     });
 
+    it('authenticates user A via session cookie', async () => {
+      const res = await testRequest('/api/auth/me', { cookie: userA_Cookie });
+      expect(res.status).toBe(200);
+      expect(res.data.user.id).toBe(userA_Id);
+    });
+
     describe('Client and Invoice Management & Tenant Isolation', () => {
       let clientA_Id: string;
       let invoiceA_Id: string;
@@ -274,7 +283,7 @@ describe('Receipto Backend Routes & Security Test Suite', () => {
         expect(Array.isArray(resA.data.clients)).toBe(true);
         expect(resA.data.clients.some((c: any) => c.id === clientA_Id)).toBe(true);
 
-        const resB = await testRequest('/api/clients', { token: userB_Token });
+        const resB = await testRequest('/api/clients', { cookie: userB_Cookie });
         expect(resB.status).toBe(200);
         expect(Array.isArray(resB.data.clients)).toBe(true);
         expect(resB.data.clients.some((c: any) => c.id === clientA_Id)).toBe(false);

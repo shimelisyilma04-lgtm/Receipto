@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import type { Request, Response, NextFunction } from 'express';
-import { getSession, deleteSession, createSession, getUserById } from './db.js';
+import { getSession } from './db.js';
 import type { User } from './types.js';
 
 export const COOKIE_NAME = 'receipto_session';

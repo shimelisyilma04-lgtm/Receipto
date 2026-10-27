@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import type { EmailVerification, User } from './types.js';
+import type { User } from './types.js';
 import * as db from './db.js';
 import { sendVerificationEmail } from './email.js';
 

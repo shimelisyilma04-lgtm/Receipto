@@ -8,8 +8,6 @@ import {
   Phone,
   Edit2,
   Trash2,
-  FileText,
-  DollarSign,
   Sparkles,
 } from 'lucide-react';
 import type { Client, Invoice } from '../types.js';

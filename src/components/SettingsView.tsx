@@ -1,15 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Settings,
-  Shield,
   Database,
   Mail,
   CheckCircle,
-  AlertCircle,
   KeyRound,
   Building2,
   Server,
-  Info,
 } from 'lucide-react';
 import type { User, SystemConfig } from '../types.js';
 import { api } from '../api.js';

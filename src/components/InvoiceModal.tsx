@@ -46,6 +46,7 @@ export function InvoiceModal({
     } else if (clients.length > 0 && !clientId) {
       setClientId(clients[0].id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialInvoice, clients]);
 
   if (!isOpen) return null;

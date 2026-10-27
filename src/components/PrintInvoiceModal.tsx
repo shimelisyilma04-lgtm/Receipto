@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Printer, Download, CheckCircle, AlertTriangle, Building2, Loader2 } from 'lucide-react';
+import { X, Printer, CheckCircle, AlertTriangle, Building2, Loader2 } from 'lucide-react';
 import type { Invoice, User } from '../types.js';
 import { ReceiptoLogo } from './ReceiptoLogo.js';
 import { getStoredToken } from '../api.js';

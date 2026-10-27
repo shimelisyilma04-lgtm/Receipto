@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Shield, FileText, RefreshCw, Mail, CheckCircle, CreditCard, Lock, Server, Send } from 'lucide-react';
+import { ArrowLeft, Shield, Mail, CheckCircle, CreditCard, Server, Send } from 'lucide-react';
 import { ReceiptoLogo } from './ReceiptoLogo.js';
 
 export type LegalTab = 'terms' | 'privacy' | 'refund';

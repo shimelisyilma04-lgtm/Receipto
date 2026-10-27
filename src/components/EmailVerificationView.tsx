@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Receipt,
   Mail,
   ShieldCheck,
   RefreshCw,
@@ -10,7 +9,6 @@ import {
   ArrowRight,
   LogOut,
   Clock,
-  Sparkles,
 } from 'lucide-react';
 import { api, ApiError } from '../api.js';
 import type { User } from '../types.js';
@@ -43,7 +41,7 @@ export function EmailVerificationView({
   user,
   initialDeliveryStatus = 'sent',
   initialDevOtp,
-  initialMessage,
+  initialMessage: _initialMessage,
   onVerified,
   onLogout,
   onShowToast,
@@ -54,7 +52,6 @@ export function EmailVerificationView({
   const [devOtp, setDevOtp] = useState<string | undefined>(initialDevOtp);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
 
   // Timers
   const [secondsRemaining, setSecondsRemaining] = useState<number>(EXPIRATION_SECONDS);
