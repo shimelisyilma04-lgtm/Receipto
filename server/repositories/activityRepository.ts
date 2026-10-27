@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import type { ActivityLog } from '../types.js';
-import { memoryStore, saveStore, reloadLocalStore } from '../lib/dbStore.js';
+import { getAdminFirestore } from '../lib/firebaseAdmin.js';
 
 export async function createActivityLog(
   userIdOrData: string | { user_id: string; action: string; details: string; metadata?: any },
@@ -8,6 +8,7 @@ export async function createActivityLog(
   detailsArg?: string,
   metadataArg?: any
 ): Promise<ActivityLog> {
+  const db = getAdminFirestore();
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
@@ -33,18 +34,26 @@ export async function createActivityLog(
     user_id,
     action,
     details,
-    metadata,
     created_at: now,
   };
-  memoryStore.activity_logs.push(log);
-  saveStore();
+  if (metadata !== undefined) {
+    log.metadata = metadata;
+  }
+
+  await db.collection('users').doc(user_id).collection('activity_logs').doc(id).set(log);
   return log;
 }
 
 export async function getActivityLogs(userId: string, limit = 50): Promise<ActivityLog[]> {
-  reloadLocalStore();
-  return memoryStore.activity_logs
-    .filter((a) => a.user_id === userId)
+  const db = getAdminFirestore();
+  const snap = await db.collection('users').doc(userId).collection('activity_logs').get();
+  const logs: ActivityLog[] = [];
+
+  snap.forEach((d: any) => {
+    logs.push(d.data() as ActivityLog);
+  });
+
+  return logs
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, limit);
 }

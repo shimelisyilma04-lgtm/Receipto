@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import crypto from 'crypto';
 import {
   initDatabase,
-  reloadLocalStore,
+  resetTestFirestore,
   createUser,
   getUserById,
   getUserByEmail,
@@ -44,8 +44,8 @@ describe('Authoritative Repository Layer Tests', () => {
   let invoice1Id: string;
 
   beforeAll(async () => {
+    resetTestFirestore();
     await initDatabase();
-    reloadLocalStore();
   });
 
   describe('User Repository', () => {

@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import type { Request, Response, NextFunction } from 'express';
-import { getSession } from './db.js';
+import { getSession, getUserById, getUserByEmail, createUser, getAdminAuth } from './db.js';
 import type { User } from './types.js';
 
 export const COOKIE_NAME = 'receipto_session';
@@ -157,7 +157,49 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
   }
 
   try {
-    const session = await getSession(token);
+    let session = await getSession(token);
+
+    // If not found in sessions collection, verify if it's a Firebase ID token
+    if (!session && token.length > 50) {
+      try {
+        const auth = getAdminAuth();
+        if (auth) {
+          const decoded = await auth.verifyIdToken(token);
+          if (decoded && decoded.uid) {
+            let user = await getUserById(decoded.uid);
+            if (!user && decoded.email) {
+              user = await getUserByEmail(decoded.email);
+            }
+            if (!user && decoded.email) {
+              user = await createUser({
+                id: decoded.uid,
+                email: decoded.email,
+                password_hash: '',
+                name: (decoded.name as string) || 'User',
+                email_verified: Boolean(decoded.email_verified),
+                role: 'USER',
+                status: 'ACTIVE',
+              });
+            }
+            if (user) {
+              session = {
+                session: {
+                  id: `firebase_${decoded.uid}`,
+                  user_id: user.id,
+                  token,
+                  expires_at: new Date(decoded.exp * 1000).toISOString(),
+                  created_at: new Date().toISOString(),
+                },
+                user,
+              };
+            }
+          }
+        }
+      } catch {
+        // Fall through to unauthenticated
+      }
+    }
+
     if (!session) {
       clearAuthCookie(res);
       return sendAuthError(req, res, 401, 'Session expired or invalidated. Please log in again.');

@@ -1,16 +1,29 @@
 import type { DashboardStats } from './types.js';
 import { logger } from './lib/logger.js';
-import { reloadLocalStore } from './lib/dbStore.js';
 import { getInvoices } from './repositories/invoiceRepository.js';
 import { getActivityLogs } from './repositories/activityRepository.js';
 import { getClients } from './repositories/clientRepository.js';
-
-import { pingFirestore, getFirestoreApp } from './lib/firestoreClient.js';
+import {
+  initFirebaseAdmin,
+  getAdminFirestore,
+  getAdminAuth,
+  pingAdminFirestore,
+  resetTestFirestore,
+  hasFirebaseAdminCredentials,
+} from './lib/firebaseAdmin.js';
 
 // Re-export concurrency locking primitive
 export { AsyncKeyLock } from './lib/asyncKeyLock.js';
-export { userMutex, reloadLocalStore, saveStore, memoryStore } from './lib/dbStore.js';
-export { pingFirestore } from './lib/firestoreClient.js';
+
+// Re-export Firebase Admin and Firestore utilities
+export {
+  initFirebaseAdmin,
+  getAdminFirestore,
+  getAdminAuth,
+  pingAdminFirestore,
+  resetTestFirestore,
+  hasFirebaseAdminCredentials,
+};
 
 // Re-export User & Session Repository
 export {
@@ -104,32 +117,44 @@ export {
   getAdminSystemHealth,
 } from './repositories/adminRepository.js';
 
-// Initialize database schema (Cloud Firestore Backend)
+// Initialize authoritative backend Firestore connection
 export async function initDatabase(): Promise<{
   success: boolean;
   engine: 'firestore';
   error?: string;
   latencyMs?: number;
 }> {
-  reloadLocalStore();
-  const probe = await pingFirestore();
-  if (probe.connected) {
-    logger.info(
-      { databaseId: probe.databaseId, projectId: probe.projectId, latencyMs: probe.latencyMs },
-      '[Receipto] Cloud Firestore authoritative connection established successfully.'
-    );
-    return { success: true, engine: 'firestore', latencyMs: probe.latencyMs };
-  } else {
-    logger.warn(
-      { error: probe.error },
-      '[Receipto] Cloud Firestore connection probe returned offline. Local data cache loaded.'
-    );
-    return { success: false, engine: 'firestore', error: probe.error };
+  try {
+    initFirebaseAdmin();
+    const probe = await pingAdminFirestore();
+    if (probe.connected) {
+      logger.info(
+        { databaseId: probe.databaseId, projectId: probe.projectId, latencyMs: probe.latencyMs, source: probe.source },
+        '[Receipto] Authoritative Cloud Firestore initialized successfully.'
+      );
+      return { success: true, engine: 'firestore', latencyMs: probe.latencyMs };
+    } else {
+      if (process.env.NODE_ENV === 'production') {
+        logger.fatal(
+          { error: probe.error },
+          '[Receipto] Critical: Cloud Firestore connection failed in production.'
+        );
+      } else {
+        logger.warn(
+          { error: probe.error },
+          '[Receipto] Cloud Firestore connection probe returned offline.'
+        );
+      }
+      return { success: false, engine: 'firestore', error: probe.error };
+    }
+  } catch (err: any) {
+    logger.error({ err: err.message }, '[Receipto] Failed to initialize Firestore backend');
+    return { success: false, engine: 'firestore', error: err.message };
   }
 }
 
 export function isDatabaseConfigured(): boolean {
-  return getFirestoreApp() !== null;
+  return hasFirebaseAdminCredentials();
 }
 
 export async function checkDatabaseHealth(): Promise<{
@@ -138,13 +163,13 @@ export async function checkDatabaseHealth(): Promise<{
   details?: string;
   latencyMs?: number;
 }> {
-  const probe = await pingFirestore();
+  const probe = await pingAdminFirestore();
   if (probe.connected) {
     return {
       connected: true,
       engine: 'firestore',
       latencyMs: probe.latencyMs,
-      details: `Cloud Firestore authoritative backend (database: ${probe.databaseId}, project: ${probe.projectId}, latency: ${probe.latencyMs}ms)`,
+      details: `Cloud Firestore authoritative backend (database: ${probe.databaseId}, project: ${probe.projectId}, latency: ${probe.latencyMs}ms, source: ${probe.source})`,
     };
   }
   return {

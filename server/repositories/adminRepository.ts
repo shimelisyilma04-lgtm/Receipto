@@ -4,42 +4,70 @@ import type {
   AdminSubscriptionItem,
   AdminSystemHealth,
 } from '../types.js';
-import { memoryStore, saveStore, reloadLocalStore } from '../lib/dbStore.js';
-import { isStripeConfigured, isStripeWebhookConfigured, getStripePublishableKey } from '../stripe.js';
+import { getAdminFirestore } from '../lib/firebaseAdmin.js';
+import { deleteUserSessions } from './userRepository.js';
+import { isStripeConfigured } from '../stripe.js';
 import { logger } from '../lib/logger.js';
 
 export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
-  reloadLocalStore();
-  const totalUsers = memoryStore.users.length;
-  const activeUsers = memoryStore.users.filter((u) => u.status === 'ACTIVE').length;
-  const suspendedUsers = memoryStore.users.filter((u) => u.status === 'SUSPENDED').length;
-  const adminUsers = memoryStore.users.filter((u) => u.role === 'ADMIN').length;
-  const verifiedUsers = memoryStore.users.filter((u) => u.email_verified).length;
+  const db = getAdminFirestore();
+
+  const [usersSnap, invoicesSnap, remindersSnap, clientsSnap, subsSnap, activitySnap] = await Promise.all([
+    db.collection('users').get(),
+    db.collectionGroup('invoices').get(),
+    db.collectionGroup('reminders').get(),
+    db.collectionGroup('clients').get(),
+    db.collectionGroup('subscription').get(),
+    db.collectionGroup('activity_logs').get(),
+  ]);
+
+  const users: any[] = [];
+  usersSnap.forEach((d: any) => users.push(d.data()));
+
+  const invoices: any[] = [];
+  invoicesSnap.forEach((d: any) => invoices.push(d.data()));
+
+  const reminders: any[] = [];
+  remindersSnap.forEach((d: any) => reminders.push(d.data()));
+
+  const subscriptions: any[] = [];
+  subsSnap.forEach((d: any) => subscriptions.push(d.data()));
+
+  const activityLogs: any[] = [];
+  activitySnap.forEach((d: any) => activityLogs.push(d.data()));
+
+  const totalUsers = users.length;
+  const activeUsers = users.filter((u) => u.status === 'ACTIVE').length;
+  const suspendedUsers = users.filter((u) => u.status === 'SUSPENDED').length;
+  const adminUsers = users.filter((u) => u.role === 'ADMIN').length;
+  const verifiedUsers = users.filter((u) => u.email_verified).length;
   const unverifiedUsers = totalUsers - verifiedUsers;
 
-  const totalInvoices = memoryStore.invoices.length;
-  const totalReminders = memoryStore.reminders.length;
-  const paidInvoicesCount = memoryStore.invoices.filter((i) => i.payment_status === 'PAID').length;
-  const overdueInvoicesCount = memoryStore.invoices.filter((i) => i.payment_status === 'OVERDUE').length;
+  const totalInvoices = invoices.length;
+  const totalReminders = reminders.length;
+  const paidInvoicesCount = invoices.filter((i) => i.payment_status === 'PAID').length;
+  const overdueInvoicesCount = invoices.filter((i) => i.payment_status === 'OVERDUE').length;
 
   let paidInvoicesSum = 0;
-  memoryStore.invoices.forEach((i) => {
-    if (i.payment_status === 'PAID') paidInvoicesSum += i.amount;
+  invoices.forEach((i) => {
+    if (i.payment_status === 'PAID') paidInvoicesSum += Number(i.amount) || 0;
   });
 
-  const freeUsers = memoryStore.subscriptions.filter((s) => s.plan === 'FREE').length;
-  const starterUsers = memoryStore.subscriptions.filter((s) => s.plan === 'STARTER').length;
-  const growthUsers = memoryStore.subscriptions.filter((s) => s.plan === 'GROWTH').length;
-  const activeSubs = memoryStore.subscriptions.filter((s) => s.status === 'active').length;
-  const pastDueSubs = memoryStore.subscriptions.filter((s) => s.status === 'past_due').length;
-  const cancelledSubs = memoryStore.subscriptions.filter((s) => s.status === 'cancelled' || (s.status as any) === 'canceled').length;
+  const freeUsers = subscriptions.filter((s) => s.plan === 'FREE').length;
+  const starterUsers = subscriptions.filter((s) => s.plan === 'STARTER').length;
+  const growthUsers = subscriptions.filter((s) => s.plan === 'GROWTH').length;
+  const activeSubs = subscriptions.filter((s) => s.status === 'active').length;
+  const pastDueSubs = subscriptions.filter((s) => s.status === 'past_due').length;
+  const cancelledSubs = subscriptions.filter((s) => s.status === 'cancelled' || s.status === 'canceled').length;
 
-  const activePaidSubs = memoryStore.subscriptions.filter(
+  const activePaidSubs = subscriptions.filter(
     (s) => s.status === 'active' && s.plan !== 'FREE'
   );
   const mrr = activePaidSubs.reduce((acc, s) => {
     return acc + (s.plan === 'GROWTH' ? 49 : s.plan === 'STARTER' ? 19 : 0);
   }, 0);
+
+  activityLogs.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
 
   return {
     total_users: totalUsers,
@@ -54,7 +82,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
     active_subscriptions: activeSubs,
     past_due_subscriptions: pastDueSubs,
     cancelled_subscriptions: cancelledSubs,
-    total_clients: memoryStore.clients.length,
+    total_clients: clientsSnap.size,
     total_invoices: totalInvoices,
     paid_invoices: paidInvoicesCount,
     total_paid_invoices_amount: paidInvoicesSum,
@@ -68,7 +96,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
     },
     active_paid_subscriptions_count: activePaidSubs.length,
     mrr_usd: mrr,
-    recent_activity: memoryStore.activity_logs.slice(0, 10),
+    recent_activity: activityLogs.slice(0, 10),
     system_health: {
       database: 'PASS',
       email: process.env.RESEND_API_KEY ? 'PASS' : 'NOT CONFIGURED',
@@ -86,12 +114,42 @@ export async function getAdminUsers(params?: {
   page?: number;
   limit?: number;
 }): Promise<{ users: AdminUserItem[]; total: number; page: number; totalPages: number }> {
-  reloadLocalStore();
-  let list = [...memoryStore.users];
+  const db = getAdminFirestore();
+  const [usersSnap, subsSnap, clientsSnap, invoicesSnap] = await Promise.all([
+    db.collection('users').get(),
+    db.collectionGroup('subscription').get(),
+    db.collectionGroup('clients').get(),
+    db.collectionGroup('invoices').get(),
+  ]);
+
+  const subMap = new Map<string, any>();
+  subsSnap.forEach((sDoc: any) => {
+    const s = sDoc.data();
+    subMap.set(s.user_id, s);
+  });
+
+  const clientCountMap = new Map<string, number>();
+  clientsSnap.forEach((cDoc: any) => {
+    const c = cDoc.data();
+    if (c.user_id) {
+      clientCountMap.set(c.user_id, (clientCountMap.get(c.user_id) || 0) + 1);
+    }
+  });
+
+  const invoiceCountMap = new Map<string, number>();
+  invoicesSnap.forEach((iDoc: any) => {
+    const i = iDoc.data();
+    if (i.user_id) {
+      invoiceCountMap.set(i.user_id, (invoiceCountMap.get(i.user_id) || 0) + 1);
+    }
+  });
+
+  let list: any[] = [];
+  usersSnap.forEach((uDoc: any) => list.push(uDoc.data()));
 
   if (params?.search) {
     const q = params.search.toLowerCase();
-    list = list.filter((u) => u.email.toLowerCase().includes(q) || u.name.toLowerCase().includes(q));
+    list = list.filter((u) => u.email?.toLowerCase().includes(q) || u.name?.toLowerCase().includes(q));
   }
   if (params?.role && params.role !== 'ALL') {
     list = list.filter((u) => u.role === params.role);
@@ -100,90 +158,167 @@ export async function getAdminUsers(params?: {
     list = list.filter((u) => u.status === params.status);
   }
 
-  const subMap = new Map(memoryStore.subscriptions.map((s) => [s.user_id, s]));
-
-  const mapped: AdminUserItem[] = list.map((u) => {
+  const items: AdminUserItem[] = list.map((u) => {
     const sub = subMap.get(u.id);
     return {
       id: u.id,
       email: u.email,
       name: u.name,
       business_name: u.business_name,
-      email_verified: u.email_verified,
-      role: u.role,
-      status: u.status,
+      email_verified: Boolean(u.email_verified),
+      role: u.role || 'USER',
+      status: u.status || 'ACTIVE',
+      created_at: u.created_at,
+      last_login_at: u.last_login_at,
       plan: sub?.plan || 'FREE',
       subscription_status: sub?.status || 'active',
-      client_count: memoryStore.clients.filter((c) => c.user_id === u.id).length,
-      invoice_count: memoryStore.invoices.filter((i) => i.user_id === u.id).length,
-      last_login_at: u.last_login_at,
-      created_at: u.created_at,
+      client_count: clientCountMap.get(u.id) || 0,
+      invoice_count: invoiceCountMap.get(u.id) || 0,
     };
   });
 
+  if (params?.plan && params.plan !== 'ALL') {
+    list = items.filter((u) => u.plan === params.plan);
+  } else {
+    list = items;
+  }
+
+  list.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+
+  const page = Math.max(1, params?.page || 1);
+  const limit = Math.max(1, Math.min(100, params?.limit || 20));
+  const total = list.length;
+  const paginated = list.slice((page - 1) * limit, page * limit);
+
   return {
-    users: mapped,
-    total: mapped.length,
-    page: 1,
-    totalPages: 1,
+    users: paginated,
+    total,
+    page,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
   };
 }
 
 export async function suspendUser(
-  adminIdOrUserId: string,
-  maybeTargetId?: string
-): Promise<{ success: boolean; error?: string }> {
-  const targetId = maybeTargetId || adminIdOrUserId;
-  const user = memoryStore.users.find((u) => u.id === targetId);
-  if (!user) return { success: false, error: 'User not found.' };
-  if (maybeTargetId && adminIdOrUserId === targetId) {
-    return { success: false, error: 'Administrators cannot suspend their own account.' };
+  adminIdOrTargetId: string,
+  targetIdOptional?: string
+): Promise<{ success: boolean; message: string; error?: string }> {
+  const adminId = targetIdOptional ? adminIdOrTargetId : undefined;
+  const targetId = targetIdOptional ? targetIdOptional : adminIdOrTargetId;
+
+  if (adminId && adminId === targetId) {
+    return {
+      success: false,
+      message: 'Administrators cannot suspend their own account.',
+      error: 'Administrators cannot suspend their own account.',
+    };
   }
-  user.status = 'SUSPENDED';
-  saveStore();
-  logger.info({ targetId, adminId: adminIdOrUserId }, 'Admin suspended user');
-  return { success: true };
+
+  const db = getAdminFirestore();
+  const docRef = db.collection('users').doc(targetId);
+  const snap = await docRef.get();
+  if (!snap.exists) {
+    return { success: false, message: 'User not found', error: 'User not found' };
+  }
+
+  const now = new Date().toISOString();
+  await docRef.set({ status: 'SUSPENDED', updated_at: now }, { merge: true });
+  await deleteUserSessions(targetId);
+
+  logger.info({ targetId, adminId }, 'Admin suspended user in Firestore');
+  return { success: true, message: 'User account suspended and active sessions revoked.' };
 }
 
 export async function restoreUser(
-  adminIdOrUserId: string,
-  maybeTargetId?: string
-): Promise<{ success: boolean; error?: string }> {
-  const targetId = maybeTargetId || adminIdOrUserId;
-  const user = memoryStore.users.find((u) => u.id === targetId);
-  if (!user) return { success: false, error: 'User not found.' };
-  user.status = 'ACTIVE';
-  saveStore();
-  logger.info({ targetId, adminId: adminIdOrUserId }, 'Admin restored user');
-  return { success: true };
+  adminIdOrTargetId: string,
+  targetIdOptional?: string
+): Promise<{ success: boolean; message: string; error?: string }> {
+  const adminId = targetIdOptional ? adminIdOrTargetId : undefined;
+  const targetId = targetIdOptional ? targetIdOptional : adminIdOrTargetId;
+
+  const db = getAdminFirestore();
+  const docRef = db.collection('users').doc(targetId);
+  const snap = await docRef.get();
+  if (!snap.exists) {
+    return { success: false, message: 'User not found', error: 'User not found' };
+  }
+
+  const now = new Date().toISOString();
+  await docRef.set({ status: 'ACTIVE', updated_at: now }, { merge: true });
+
+  logger.info({ targetId, adminId }, 'Admin restored user in Firestore');
+  return { success: true, message: 'User account restored to active status.' };
 }
 
 export async function updateUserRole(
-  adminIdOrUserId: string,
-  targetIdOrRole: string,
-  maybeRole?: 'USER' | 'ADMIN'
-): Promise<{ success: boolean; error?: string }> {
-  const targetId = maybeRole ? targetIdOrRole : adminIdOrUserId;
-  const role = (maybeRole || targetIdOrRole) as 'USER' | 'ADMIN';
-  const user = memoryStore.users.find((u) => u.id === targetId);
-  if (!user) return { success: false, error: 'User not found.' };
-  user.role = role;
-  saveStore();
-  logger.info({ targetId, role, adminId: adminIdOrUserId }, 'Admin updated user role');
-  return { success: true };
+  arg1: string,
+  arg2: string,
+  arg3?: string
+): Promise<{ success: boolean; error?: string; message?: string }> {
+  let adminId: string | undefined;
+  let targetId: string;
+  let role: 'ADMIN' | 'USER';
+
+  if (arg3) {
+    // Called as (adminId, targetId, role)
+    adminId = arg1;
+    targetId = arg2;
+    role = arg3 as 'ADMIN' | 'USER';
+  } else {
+    // Called as (targetId, role)
+    targetId = arg1;
+    role = arg2 as 'ADMIN' | 'USER';
+  }
+
+  if (adminId && adminId === targetId && role !== 'ADMIN') {
+    return { success: false, error: 'Administrators cannot remove their own admin privileges.' };
+  }
+
+  const db = getAdminFirestore();
+  const docRef = db.collection('users').doc(targetId);
+  const snap = await docRef.get();
+  if (!snap.exists) {
+    return { success: false, error: 'User not found' };
+  }
+
+  const now = new Date().toISOString();
+  await docRef.set({ role, updated_at: now }, { merge: true });
+
+  // Update admins collection for Firestore Security Rules isAdmin check
+  if (role === 'ADMIN') {
+    const userData = snap.data();
+    await db.collection('admins').doc(targetId).set({
+      user_id: targetId,
+      email: userData?.email || '',
+      role: 'ADMIN',
+      granted_at: now,
+    });
+  } else {
+    await db.collection('admins').doc(targetId).delete();
+  }
+
+  logger.info({ targetId, role, adminId }, 'Admin updated user role in Firestore');
+  return { success: true, message: `User role successfully updated to ${role}` };
 }
 
 export async function getAdminSubscriptions(params?: {
   page?: number;
   limit?: number;
 }): Promise<{ subscriptions: AdminSubscriptionItem[]; total: number; page: number; totalPages: number }> {
-  reloadLocalStore();
-  const userMap = new Map(memoryStore.users.map((u) => [u.id, u]));
+  const db = getAdminFirestore();
+  const [usersSnap, subsSnap] = await Promise.all([
+    db.collection('users').get(),
+    db.collectionGroup('subscription').get(),
+  ]);
 
-  const subs: AdminSubscriptionItem[] = memoryStore.subscriptions.map((s) => {
+  const userMap = new Map<string, any>();
+  usersSnap.forEach((uDoc: any) => userMap.set(uDoc.id, uDoc.data()));
+
+  const subs: AdminSubscriptionItem[] = [];
+  subsSnap.forEach((sDoc: any) => {
+    const s = sDoc.data();
     const u = userMap.get(s.user_id);
-    return {
-      id: s.id,
+    subs.push({
+      id: s.id || sDoc.id,
       user_id: s.user_id,
       user_email: u?.email || 'unknown',
       user_name: u?.name || 'unknown',
@@ -199,7 +334,7 @@ export async function getAdminSubscriptions(params?: {
       current_period_end: s.current_period_end,
       cancel_at_period_end: s.cancel_at_period_end,
       created_at: s.created_at,
-    };
+    });
   });
 
   const page = Math.max(1, params?.page || 1);
@@ -221,15 +356,23 @@ export async function getAdminActivityLogs(params?: {
   page?: number;
   limit?: number;
 }): Promise<{ logs: any[]; total: number; page: number; totalPages: number }> {
-  reloadLocalStore();
-  let logs = [...memoryStore.activity_logs];
+  const db = getAdminFirestore();
+  let snap: any;
+
   if (params?.userId) {
-    logs = logs.filter((l) => l.user_id === params.userId);
+    snap = await db.collection('users').doc(params.userId).collection('activity_logs').get();
+  } else {
+    snap = await db.collectionGroup('activity_logs').get();
   }
+
+  let logs: any[] = [];
+  snap.forEach((d: any) => logs.push(d.data()));
+
   if (params?.action) {
     logs = logs.filter((l) => l.action === params.action);
   }
-  logs.sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+  logs.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
 
   const page = Math.max(1, params?.page || 1);
   const limit = Math.max(1, Math.min(100, params?.limit || 50));
@@ -257,35 +400,36 @@ export async function getAdminSystemHealth(workerStatus?: any): Promise<AdminSys
     },
     email: {
       status: emailConfigured ? 'PASS' : 'NOT CONFIGURED',
-      configured: emailConfigured,
       provider: 'Resend',
-      from_email: process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL || 'Receipto <billing@resend.dev>',
+      from_email: process.env.EMAIL_FROM || 'receiptobusiness@gmail.com',
+      configured: emailConfigured,
+      details: emailConfigured ? 'Resend API key configured' : 'RESEND_API_KEY is not set',
     },
     stripe: {
       status: stripeConfigured ? 'PASS' : 'NOT CONFIGURED',
       configured: stripeConfigured,
-      webhook_configured: isStripeWebhookConfigured(),
-      price_ids_configured: stripeConfigured,
-      publishable_key_configured: Boolean(getStripePublishableKey()),
+      webhook_configured: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
+      publishable_key_configured: Boolean(process.env.STRIPE_PUBLISHABLE_KEY),
+      price_ids_configured: Boolean(process.env.STRIPE_PRICE_STARTER_MONTHLY),
     },
     application: {
       status: 'PASS',
-      app: 'Receipto SaaS',
-      version: '1.0.0',
-      environment: process.env.NODE_ENV || 'production',
+      app: 'Receipto',
+      version: '1.2.0',
+      environment: process.env.NODE_ENV || 'development',
       uptime_seconds: Math.floor(process.uptime()),
       memory_usage_mb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
       node_version: process.version,
     },
-    worker: workerStatus || {
-      status: 'PASS',
-      running: true,
-      last_run_at: new Date().toISOString(),
-      last_success_at: new Date().toISOString(),
+    worker: {
+      status: workerStatus?.running ? 'PASS' : 'WARNING',
+      running: Boolean(workerStatus?.running),
+      last_run_at: workerStatus?.lastRunAt || null,
+      last_success_at: workerStatus?.lastSuccessAt || null,
       last_failure_at: null,
-      last_error: null,
-      total_runs: 1,
-      total_reminders_sent: 0,
+      last_error: workerStatus?.lastError || null,
+      total_runs: workerStatus?.totalRuns || 0,
+      total_reminders_sent: workerStatus?.totalRemindersSent || 0,
       interval_seconds: 60,
     },
   };

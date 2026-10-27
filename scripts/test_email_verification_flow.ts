@@ -269,10 +269,9 @@ async function run() {
   console.log('\n--- 7. Testing Valid Verification Flow ---');
 
   // Let's import the database and verification helper directly in this script to verify the crypto hash
-  const { getLatestEmailVerification, reloadLocalStore } = await import('../server/db.js');
+  const { getLatestEmailVerification } = await import('../server/db.js');
   const { verifyOTPHash } = await import('../server/verification.js');
 
-  reloadLocalStore();
   const verifRecord = await getLatestEmailVerification(registeredUserId);
   assert(verifRecord !== null, 'Verification record found in persistent store');
   assert(Boolean(verifRecord?.otp_hash), 'OTP is stored exclusively as cryptographic hash');

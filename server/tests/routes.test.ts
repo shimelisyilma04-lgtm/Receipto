@@ -7,7 +7,7 @@ import type { AddressInfo } from 'net';
 import { router, healthHandler, readinessHandler } from '../routes.js';
 import {
   initDatabase,
-  reloadLocalStore,
+  resetTestFirestore,
   setUserEmailVerified,
   checkDatabaseHealth,
   isWebhookEventProcessed,
@@ -59,8 +59,8 @@ async function testRequest(path: string, options: { method?: string; body?: any;
 
 describe('Receipto Backend Routes & Security Test Suite', () => {
   beforeAll(async () => {
+    resetTestFirestore();
     await initDatabase();
-    reloadLocalStore();
 
     const app = express();
     app.use(express.json());
