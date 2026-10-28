@@ -161,10 +161,23 @@ export function initFirebaseAdmin(): { app: App | null; db: any; config: Firebas
 }
 
 /**
+ * Enable in-memory Firestore adapter (e.g. for development when credentials are unavailable)
+ */
+export function enableInMemoryFallback(): void {
+  if (!testFirestoreInstance) {
+    testFirestoreInstance = new InMemoryFirestore();
+  }
+  firestoreInstance = testFirestoreInstance;
+}
+
+/**
  * Get authoritative Firestore instance.
  */
 export function getAdminFirestore(): any {
   if (customTestFirestore) return customTestFirestore;
+  if (firestoreInstance === testFirestoreInstance && testFirestoreInstance) {
+    return testFirestoreInstance;
+  }
   const isTest = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
   if (isTest && !process.env.FIREBASE_SERVICE_ACCOUNT?.trim() && !process.env.FIRESTORE_EMULATOR_HOST) {
     if (!testFirestoreInstance) {

@@ -102,6 +102,10 @@ npm ci
 │   │   ├── subscriptionRepository.ts
 │   │   ├── verificationRepository.ts
 │   │   └── adminRepository.ts
+│   ├── email/                  # Modular transactional email service
+│   │   ├── types.ts            # Email options and result schemas
+│   │   ├── templates.ts        # Responsive HTML & text email templates
+│   │   └── client.ts           # Resend HTTP client & sender logic
 │   ├── routes/                 # Domain-specific route controllers
 │   │   ├── auth.routes.ts
 │   │   ├── clients.routes.ts
@@ -112,29 +116,54 @@ npm ci
 │   │   ├── admin.routes.ts
 │   │   ├── helpers.routes.ts
 │   │   └── invoicePrintTemplate.ts
-│   └── tests/                  # Backend automated test suite
+│   └── tests/                  # Backend automated test suite (164 tests total)
 │       ├── routes.test.ts      # Real route tests, auth, tenant isolation
-│       └── repositories.test.ts# Isolated unit tests for domain repositories
+│       ├── repositories.test.ts# Isolated unit tests for domain repositories
+│       ├── reminders.test.ts   # Follow-up workflows, preview & automated reminders
+│       ├── billing.test.ts     # Stripe checkout, portal, and webhook signatures
+│       ├── email.test.ts       # Email templates, preview & dispatch logic
+│       ├── plans.test.ts       # Plan configurations, limits & features
+│       ├── adminActivity.test.ts # Admin metrics, audit logs & system health
+│       └── worker.test.ts      # Automated reminder background worker cycles
 ├── src/                        # Frontend React SPA
 │   ├── App.tsx                 # Main application controller & routing
-│   ├── api.ts                  # Client API & Firebase Auth client
+│   ├── api.ts                  # Clean facade for modularized API services
+│   ├── api/                    # Modular API client domain modules
+│   │   ├── client.ts           # Central fetch wrapper, CSRF & auth token handling
+│   │   ├── auth.ts             # Login, register, email verification, logout
+│   │   ├── clients.ts          # Client CRUD operations
+│   │   ├── invoices.ts         # Invoice CRUD, status & PDF export
+│   │   ├── reminders.ts        # Manual & automated reminder API
+│   │   ├── billing.ts          # Stripe billing checkout & customer portal
+│   │   └── admin.ts            # Admin dashboard, users, and audit logs
 │   ├── firebase.ts             # Firebase SDK client initialization
-│   ├── components/             # UI views, modals, and legal pages
+│   ├── components/             # UI views, modular components, and legal pages
 │   │   ├── AdminPanel.tsx      # Orchestrator administration view
-│   │   ├── admin/              # Modular admin subcomponents
-│   │   │   ├── AdminOverview.tsx
-│   │   │   ├── AdminUsers.tsx
-│   │   │   ├── AdminSubscriptions.tsx
-│   │   │   ├── AdminActivity.tsx
-│   │   │   └── AdminSystem.tsx
 │   │   ├── BillingView.tsx     # Stripe subscription & billing management
+│   │   ├── billing/            # Modular billing components
+│   │   │   ├── PlanQuotaGrid.tsx
+│   │   │   ├── PlanCardsGrid.tsx
+│   │   │   └── SandboxDevPanel.tsx
+│   │   ├── EmailVerificationView.tsx # Email OTP verification screen
+│   │   ├── verification/       # Modular verification components
+│   │   │   ├── DeliveryStatusBanners.tsx
+│   │   │   └── ChangeEmailForm.tsx
 │   │   ├── LandingPage.tsx     # Responsive homepage with legal header navigation
 │   │   ├── LegalPages.tsx      # Privacy Policy, Terms, and Refund Policy
 │   │   └── Navbar.tsx          # Authenticated top header with legal menu
 │   ├── services/
-│   │   └── firestoreService.ts # Direct Firestore operations & error handlers
+│   │   ├── firestoreService.ts # Facade re-exporting domain firestore operations
+│   │   └── firestore/          # Modular Firestore services
+│   │       ├── utils.ts        # Auth tokens, error formatters & converters
+│   │       ├── users.ts        # User profile & session state
+│   │       ├── clients.ts      # Client collection operations
+│   │       ├── invoices.ts     # Invoice collection operations
+│   │       ├── reminders.ts    # Reminder history operations
+│   │       └── subscriptions.ts# Subscription & usage calculations
 │   └── tests/                  # Frontend automated test suite
-│       └── api.test.ts         # API client, error parsing, and retry tests
+│       ├── api.test.ts         # API client, error parsing, and retry tests
+│       ├── firestoreService.test.ts # Unit tests for firestore operations
+│       └── firestoreDomainServices.test.ts # Domain-specific subservice tests
 └── scripts/                    # End-to-end test suites & verification tools
     ├── run_all_tests.mjs       # Master regression runner (105+ automated tests)
     ├── verify.mjs              # End-to-end integration test suite

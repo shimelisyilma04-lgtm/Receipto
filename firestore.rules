@@ -93,6 +93,16 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Sessions Collection (server-side only)
+    match /sessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    // Email Verifications (server-side only)
+    match /email_verifications/{verificationId} {
+      allow read, write: if false;
+    }
+
     // Connection test document ping
     match /test/connection {
       allow read: if true;

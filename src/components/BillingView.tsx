@@ -3,13 +3,8 @@ import {
   CreditCard,
   CheckCircle2,
   Sparkles,
-  ArrowRight,
   RefreshCw,
   ExternalLink,
-  Users,
-  FileText,
-  Clock,
-  Check,
   X,
   AlertTriangle,
   LayoutDashboard,
@@ -17,6 +12,9 @@ import {
 import type { SubscriptionDetails, SubscriptionUsage } from '../types.js';
 import { PLAN_CONFIGS, type PlanTier, type BillingInterval, isPaidSubscriptionActive } from '../plans.js';
 import { api } from '../api.js';
+import { PlanQuotaGrid } from './billing/PlanQuotaGrid.js';
+import { PlanCardsGrid } from './billing/PlanCardsGrid.js';
+import { SandboxDevPanel } from './billing/SandboxDevPanel.js';
 
 interface BillingViewProps {
   onShowToast: (message: string, type?: 'success' | 'error' | 'info') => void;
@@ -384,68 +382,7 @@ export function BillingView({
         </div>
 
         {/* Quota Usage Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-6">
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-2">
-              <span className="flex items-center gap-1.5 font-medium">
-                <Users className="w-4 h-4 text-indigo-500" />
-                <span>Clients</span>
-              </span>
-              <span className="font-bold text-slate-900 dark:text-white">
-                {usage.client_count} / {usage.max_clients !== null ? usage.max_clients : 'Unlimited'}
-              </span>
-            </div>
-            {usage.max_clients !== null && (
-              <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-300 ${
-                    usage.client_count >= usage.max_clients ? 'bg-rose-500' : 'bg-indigo-600'
-                  }`}
-                  style={{ width: `${Math.min(100, (usage.client_count / usage.max_clients) * 100)}%` }}
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-2">
-              <span className="flex items-center gap-1.5 font-medium">
-                <FileText className="w-4 h-4 text-indigo-500" />
-                <span>Invoices</span>
-              </span>
-              <span className="font-bold text-slate-900 dark:text-white">
-                {usage.invoices_this_period} / {usage.max_invoices_per_month !== null ? usage.max_invoices_per_month : 'Unlimited'}
-              </span>
-            </div>
-            {usage.max_invoices_per_month !== null && (
-              <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-300 ${
-                    usage.invoices_this_period >= usage.max_invoices_per_month ? 'bg-rose-500' : 'bg-indigo-600'
-                  }`}
-                  style={{ width: `${Math.min(100, (usage.invoices_this_period / usage.max_invoices_per_month) * 100)}%` }}
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 sm:col-span-2 lg:col-span-1">
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-2">
-              <span className="flex items-center gap-1.5 font-medium">
-                <Clock className="w-4 h-4 text-indigo-500" />
-                <span>Automated Reminders</span>
-              </span>
-              <span className="font-bold text-slate-900 dark:text-white">
-                {PLAN_CONFIGS[currentPlan]?.features.automatedReminders ? 'Enabled' : 'Free: Manual Only'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              {PLAN_CONFIGS[currentPlan]?.features.automatedReminders
-                ? 'Automated background cron runs daily.'
-                : 'Upgrade to Starter to schedule hands-free reminders.'}
-            </p>
-          </div>
-        </div>
+        <PlanQuotaGrid usage={usage} currentPlan={currentPlan} />
       </div>
 
       {/* Pricing Interval Switcher */}
@@ -478,213 +415,19 @@ export function BillingView({
       </div>
 
       {/* Plan Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-        {/* FREE PLAN */}
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 flex flex-col justify-between">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Free Tier</span>
-            <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1">Starter Free</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 min-h-[32px]">
-              Ideal for solo freelancers getting started with invoice tracking.
-            </p>
-            <div className="mt-4 mb-6">
-              <span className="text-4xl font-extrabold text-slate-900 dark:text-white">$0</span>
-              <span className="text-xs text-slate-400 ml-1">/ forever</span>
-            </div>
-            <ul className="space-y-2.5 text-xs text-slate-600 dark:text-slate-300">
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Up to 5 active clients</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Up to 10 invoices per month</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Manual 1-click email reminders</span>
-              </li>
-              <li className="flex items-center gap-2 text-slate-400">
-                <X className="w-4 h-4 text-slate-400 shrink-0" />
-                <span>No automated background reminders</span>
-              </li>
-              <li className="flex items-center gap-2 text-slate-400">
-                <X className="w-4 h-4 text-slate-400 shrink-0" />
-                <span>No CSV data export</span>
-              </li>
-            </ul>
-          </div>
-          <button
-            disabled
-            className="w-full mt-6 py-2.5 px-4 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-default"
-          >
-            {currentPlan === 'FREE' ? 'Current Plan' : 'Free Tier'}
-          </button>
-        </div>
+      <PlanCardsGrid
+        currentPlan={currentPlan}
+        billingInterval={billingInterval}
+        actionLoading={actionLoading}
+        onUpgrade={handleUpgrade}
+      />
 
-        {/* STARTER PLAN */}
-        <div className="rounded-2xl border-2 border-indigo-600 bg-white dark:bg-slate-900 p-6 flex flex-col justify-between relative shadow-lg shadow-indigo-600/10">
-          <div className="absolute -top-3 right-6 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full">
-            Most Popular
-          </div>
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Growth Tier</span>
-            <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1">Starter</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 min-h-[32px]">
-              For growing small businesses needing hands-free follow-ups.
-            </p>
-            <div className="mt-4 mb-6">
-              <span className="text-4xl font-extrabold text-slate-900 dark:text-white">
-                {billingInterval === 'annual' ? '$15' : '$19'}
-              </span>
-              <span className="text-xs text-slate-400 ml-1">
-                {billingInterval === 'annual' ? '/mo (billed annually)' : '/month'}
-              </span>
-            </div>
-            <ul className="space-y-2.5 text-xs text-slate-600 dark:text-slate-300">
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Up to 50 active clients</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Up to 100 invoices per period</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Automated scheduled reminders</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>CSV accounting export (QuickBooks/Xero)</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Priority email support</span>
-              </li>
-            </ul>
-          </div>
-          <button
-            onClick={() => handleUpgrade('STARTER')}
-            disabled={currentPlan === 'STARTER' || actionLoading === 'STARTER'}
-            className={`w-full mt-6 py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
-              currentPlan === 'STARTER'
-                ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 cursor-default'
-                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20'
-            }`}
-          >
-            {actionLoading === 'STARTER' ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : currentPlan === 'STARTER' ? (
-              'Current Plan'
-            ) : (
-              <>
-                <span>Upgrade to Starter</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* GROWTH PLAN */}
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 flex flex-col justify-between">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Scale Tier</span>
-            <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1">Growth</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 min-h-[32px]">
-              Unlimited clients, high-volume automated invoicing, and scale features.
-            </p>
-            <div className="mt-4 mb-6">
-              <span className="text-4xl font-extrabold text-slate-900 dark:text-white">
-                {billingInterval === 'annual' ? '$39' : '$49'}
-              </span>
-              <span className="text-xs text-slate-400 ml-1">
-                {billingInterval === 'annual' ? '/mo (billed annually)' : '/month'}
-              </span>
-            </div>
-            <ul className="space-y-2.5 text-xs text-slate-600 dark:text-slate-300">
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Unlimited clients</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Unlimited invoices</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Fully automated 3-tone reminders</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Full audit history log access</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Dedicated account support</span>
-              </li>
-            </ul>
-          </div>
-          <button
-            onClick={() => handleUpgrade('GROWTH')}
-            disabled={currentPlan === 'GROWTH' || actionLoading === 'GROWTH'}
-            className={`w-full mt-6 py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
-              currentPlan === 'GROWTH'
-                ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 cursor-default'
-                : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 shadow-md'
-            }`}
-          >
-            {actionLoading === 'GROWTH' ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : currentPlan === 'GROWTH' ? (
-              'Current Plan'
-            ) : (
-              <>
-                <span>Upgrade to Growth</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Developer Sandbox Drawer (for testing quota gates) */}
-      <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
-        <button
-          onClick={() => setShowSandbox(!showSandbox)}
-          className="text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 flex items-center gap-1.5"
-        >
-          <span>Developer Testing &amp; Sandbox Controls</span>
-          <span>{showSandbox ? '▲' : '▼'}</span>
-        </button>
-        {showSandbox && (
-          <div className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-            <p className="text-xs text-slate-500 mb-3">
-              Simulate tier updates directly in the local store to test quotas, automated reminders, and exports:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => handleSimulatePlan('FREE')}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"
-              >
-                Simulate Free Tier
-              </button>
-              <button
-                onClick={() => handleSimulatePlan('STARTER')}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-100 dark:bg-indigo-950/60 hover:bg-indigo-200 text-indigo-700 dark:text-indigo-300"
-              >
-                Simulate Starter Tier
-              </button>
-              <button
-                onClick={() => handleSimulatePlan('GROWTH')}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-100 dark:bg-purple-950/60 hover:bg-purple-200 text-purple-700 dark:text-purple-300"
-              >
-                Simulate Growth Tier
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Developer Sandbox Drawer */}
+      <SandboxDevPanel
+        showSandbox={showSandbox}
+        onToggleSandbox={() => setShowSandbox(!showSandbox)}
+        onSimulatePlan={handleSimulatePlan}
+      />
     </div>
   );
 }

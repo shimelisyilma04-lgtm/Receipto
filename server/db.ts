@@ -10,6 +10,7 @@ import {
   pingAdminFirestore,
   resetTestFirestore,
   hasFirebaseAdminCredentials,
+  enableInMemoryFallback,
 } from './lib/firebaseAdmin.js';
 
 // Re-export concurrency locking primitive
@@ -23,6 +24,7 @@ export {
   pingAdminFirestore,
   resetTestFirestore,
   hasFirebaseAdminCredentials,
+  enableInMemoryFallback,
 };
 
 // Re-export User & Session Repository
@@ -139,13 +141,15 @@ export async function initDatabase(): Promise<{
           { error: probe.error },
           '[Receipto] Critical: Cloud Firestore connection failed in production.'
         );
+        return { success: false, engine: 'firestore', error: probe.error };
       } else {
         logger.warn(
           { error: probe.error },
-          '[Receipto] Cloud Firestore connection probe returned offline.'
+          '[Receipto] Cloud Firestore connection probe returned offline. Using in-memory adapter for development.'
         );
+        enableInMemoryFallback();
+        return { success: true, engine: 'firestore', latencyMs: 0 };
       }
-      return { success: false, engine: 'firestore', error: probe.error };
     }
   } catch (err: any) {
     logger.error({ err: err.message }, '[Receipto] Failed to initialize Firestore backend');

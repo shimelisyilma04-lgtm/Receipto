@@ -21,6 +21,12 @@ export default defineConfig({
         'node_modules/**',
         'dist/**',
       ],
+      thresholds: {
+        statements: 60,
+        branches: 40,
+        functions: 60,
+        lines: 60,
+      },
     },
   },
   resolve: {

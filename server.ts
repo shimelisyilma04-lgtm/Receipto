@@ -9,9 +9,36 @@ import { router, healthHandler, readinessHandler } from './server/routes.js';
 import { initDatabase } from './server/db.js';
 import { startReminderWorker } from './server/worker.js';
 
+function parsePort(): number {
+  for (let i = 0; i < process.argv.length; i++) {
+    const arg = process.argv[i];
+    if (arg === '--port' && process.argv[i + 1]) {
+      return Number(process.argv[i + 1]) || 3000;
+    }
+    if (arg.startsWith('--port=')) {
+      return Number(arg.split('=')[1]) || 3000;
+    }
+  }
+  return 3000;
+}
+
+function parseHost(): string {
+  for (let i = 0; i < process.argv.length; i++) {
+    const arg = process.argv[i];
+    if (arg === '--host' && process.argv[i + 1]) {
+      return process.argv[i + 1];
+    }
+    if (arg.startsWith('--host=')) {
+      return arg.split('=')[1];
+    }
+  }
+  return '0.0.0.0';
+}
+
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+  const PORT = parsePort();
+  const HOST = parseHost();
 
   // Middlewares
   app.use(express.json({
@@ -58,7 +85,10 @@ async function startServer() {
   // Vite middleware for development or static serving for production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -70,8 +100,12 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Receipto] Production SaaS server listening on http://0.0.0.0:${PORT}`);
+  const server = app.listen(PORT, HOST, () => {
+    console.log(`[Receipto] Production SaaS server listening on http://${HOST}:${PORT}`);
+  });
+
+  server.on('error', (err: any) => {
+    console.error('[Receipto] Server error:', err.message);
   });
 }
 

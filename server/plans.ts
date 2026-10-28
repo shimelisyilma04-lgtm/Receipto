@@ -146,7 +146,7 @@ export const PLAN_CONFIGS: Record<PlanTier, PlanConfig> = {
  */
 export function isPaidSubscriptionActive(
   status: SubscriptionStatus | string | null | undefined,
-  currentPeriodEnd: string | null | undefined
+  currentPeriodEnd?: string | null | undefined
 ): boolean {
   const s = (status || '').toString().toLowerCase();
   if (s === 'active' || s === 'trialing') {
@@ -169,13 +169,14 @@ export function getEffectivePlan(
   status: SubscriptionStatus | null | undefined,
   currentPeriodEnd: string | null | undefined
 ): PlanConfig {
-  if (!tier || tier === 'FREE') {
+  const normalizedTier = ((tier || 'FREE').toUpperCase()) as PlanTier;
+  if (!normalizedTier || normalizedTier === 'FREE') {
     return PLAN_CONFIGS.FREE;
   }
 
   const effectiveStatus = status || 'active';
   if (isPaidSubscriptionActive(effectiveStatus, currentPeriodEnd)) {
-    return PLAN_CONFIGS[tier] || PLAN_CONFIGS.FREE;
+    return PLAN_CONFIGS[normalizedTier] || PLAN_CONFIGS.FREE;
   }
 
   // Gracefully fallback to FREE limits when paid period has expired or payment failed
