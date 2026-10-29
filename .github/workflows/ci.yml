@@ -34,10 +34,7 @@ jobs:
       - name: ESLint static analysis
         run: npm run lint
 
-      - name: Run automated test suite (Vitest)
-        run: npm test
-
-      - name: Generate test coverage report
+      - name: Run automated tests and enforce coverage thresholds
         run: npm run coverage
 
       - name: Build frontend and server bundles
